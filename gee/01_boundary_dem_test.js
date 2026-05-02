@@ -4,7 +4,7 @@
 // GEE PROJECT: causal-bison-488813-q1
 
 var aoi = ee.FeatureCollection('FAO/GAUL/2015/level1')
-  .filter(ee.Filter.eq('ADM1_NAME', 'Karabük'))
+  .filter(ee.Filter.eq('ADM1_NAME', 'Karabuk'))
   .geometry();
 
 print('=== KARABÜK BOUNDARY TEST ===');

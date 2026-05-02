@@ -6,7 +6,7 @@
 // TIP: If quota is low, comment out some exports and run in batches next day
 
 var aoi = ee.FeatureCollection('FAO/GAUL/2015/level1')
-  .filter(ee.Filter.eq('ADM1_NAME', 'Karabük'))
+  .filter(ee.Filter.eq('ADM1_NAME', 'Karabuk'))
   .geometry();
 Map.centerObject(aoi, 9);
 

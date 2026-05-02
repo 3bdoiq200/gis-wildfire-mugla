@@ -6,7 +6,7 @@
 // INSTRUCTIONS: Click Run to check display, then go to Tasks tab to start exports
 
 var aoi = ee.FeatureCollection('FAO/GAUL/2015/level1')
-  .filter(ee.Filter.eq('ADM1_NAME', 'Karabük'))
+  .filter(ee.Filter.eq('ADM1_NAME', 'Karabuk'))
   .geometry();
 Map.centerObject(aoi, 9);
 

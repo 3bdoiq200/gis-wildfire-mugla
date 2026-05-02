@@ -6,7 +6,7 @@
 // WARNING: Run this script ALONE on a fresh quota day
 
 var aoi = ee.FeatureCollection('FAO/GAUL/2015/level1')
-  .filter(ee.Filter.eq('ADM1_NAME', 'Karabük'))
+  .filter(ee.Filter.eq('ADM1_NAME', 'Karabuk'))
   .geometry();
 
 // Copy all feature definitions from script 04 here

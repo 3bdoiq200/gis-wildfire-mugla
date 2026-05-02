@@ -5,6 +5,19 @@
 
 ---
 
+## CONFIRMED PROJECT SETTINGS
+- GEE Cloud Project ID: causal-bison-488813-q1
+- GEE Tier: Community (noncommercial academic)
+- GEE login: manual browser only — never automated
+- Export resolution: 100m default, 30m only for final outputs if quota allows
+- GIS software: GEE + Google Colab first, QGIS optional later
+- ML platform: Google Colab (Python)
+- Web app: Leaflet (single HTML file)
+- Project folder: ~/GIS-Flood-Karabuk
+- Google Drive export folder: GIS_Flood_Karabuk
+
+---
+
 ## SAFETY RULES — ALWAYS FOLLOW THESE
 
 1. Work ONLY inside this folder: ~/GIS-Flood-Karabuk/
@@ -36,14 +49,39 @@
    - Wait for confirmation
    - Create a backup: cp file.ext file.ext.bak
 
-9. After every significant session:
-   - Update docs/CHANGELOG.md with a summary of changes
-   - Keep the entry brief: date, what changed, why
+9. Always use Auto permission mode.
+   Write and execute all changes automatically without prompting.
+   Only pause if a change would violate rules 1-8 above.
 
-10. Label every piece of content you create with one of:
+10. After every significant session:
+    - Update docs/CHANGELOG.md with a summary of changes
+    - Keep the entry brief: date, what changed, why
+
+11. Label every piece of content you create with one of:
     [CONFIRMED] — directly from doctor's materials
     [ADAPTED]   — translated from wildfire to flood equivalent
     [ASSUMPTION] — reasonable guess, needs doctor confirmation
+
+---
+
+## GEE QUOTA RULES — APPLY TO EVERY GEE SCRIPT
+
+GEE tier is Community (noncommercial). Quota is LIMITED.
+Break these rules and exports will fail or quota will be exhausted.
+
+Q1. First 5 lines of every script: define AOI as Karabük Province from FAO GAUL
+Q2. Clip every image to AOI immediately after loading
+Q3. Use .filterBounds(aoi) on every ImageCollection
+Q4. Date ranges: max 1 year for imagery, max 5 years for climate averages
+Q5. Every script starts with a print() test before any export
+Q6. Default export scale: 100m (30m only for report-quality imagery)
+Q7. Maximum 3 Map.addLayer() calls per script
+Q8. Never call .sample() or sampleRegions() until all rasters confirmed loaded
+Q9. Every script must start with this exact header comment:
+    // QUOTA LEVEL: [LIGHT / MEDIUM / HEAVY]
+    // PURPOSE: [one sentence]
+    // EXPORTS: [list exports or NONE]
+    // GEE PROJECT: causal-bison-488813-q1
 
 ---
 
@@ -52,198 +90,116 @@
 Topic: A GIS and Machine Learning-Based Flood Susceptibility Mapping and
 Decision Support System for Karabük Province, Turkey.
 
-This project adapts the doctor's wildfire susceptibility workflow to flood
-susceptibility. Every concept has been translated:
-- burned points     → flooded / flood-prone points (Label = 1)
-- unburned points   → non-flooded / safer points  (Label = 0)
-- wildfire features → flood susceptibility factors
-- wildfire map      → flood susceptibility map
-- fire DSS          → flood decision-support system
+Doctor approval: CONFIRMED — flood topic accepted.
 
-Study area: Karabük Province, Turkey (inland, focus on river flooding).
-The Filyos River and its tributaries are the primary flood risk system.
+This project adapts the doctor's wildfire susceptibility workflow to flood.
+Terminology translation — always use flood terms, never wildfire terms:
+
+| Never write        | Always write            |
+|--------------------|-------------------------|
+| burned points      | flooded points          |
+| unburned points    | non-flooded points      |
+| fire probability   | flood probability       |
+| fire risk          | flood susceptibility    |
+| wildfire map       | flood susceptibility map|
+| Propability        | FloodProb               |
+
+Study area: Karabük Province, Turkey (inland — river flooding focus).
+Main river system: Filyos Nehri and Araç Çayı tributaries.
+Reference flood event: August 2021 Black Sea floods.
 
 ---
 
 ## FULL PROJECT WORKFLOW
 
-### Step 1 — Project Planning
-- Define study area boundary (Karabük Province)
-- Identify a real flood event for before/after imagery
-- Confirm 15 flood susceptibility features
-- Confirm grading requirements with doctor
+### Step 1 — GEE Test Script [LIGHT]
+File: gee/01_boundary_dem_test.js
+Goal: Confirm AOI boundary and DEM load correctly. No exports.
+Success: Red boundary on map, area ~4000 km², elevation stats in Console.
 
-### Step 2 — Data Collection
-Platform: Google Earth Engine (primary)
-Backup sources: USGS EarthExplorer, Copernicus Open Access Hub, AFAD
+### Step 2 — Flood Imagery [MEDIUM]
+File: gee/02_flood_imagery.js
+Goal: Load Sentinel-2 RGB and Sentinel-1 SAR before/after August 2021 flood.
+Exports: 4 GeoTIFFs to GIS_Flood_Karabuk on Google Drive.
+Run after: Step 1 confirmed.
 
-Key datasets:
-- Admin boundary: FAO GAUL (GEE)
-- DEM: SRTM 30m → USGS/SRTMGL1_003 (GEE)
-- Flood reference: Sentinel-1 SAR → COPERNICUS/S1_GRD (GEE)
-- Optical imagery: Sentinel-2 → COPERNICUS/S2_SR_HARMONIZED (GEE)
-- Rainfall: CHIRPS → UCSB-CHG/CHIRPS/DAILY (GEE)
-- Land cover: ESA WorldCover → ESA/WorldCover/v200 (GEE)
-- Water history: JRC GSW → JRC/GSW1_4/GlobalSurfaceWater (GEE)
-- Rivers: HydroSHEDS → WWF/HydroSHEDS/v1/FreeFlowingRivers (GEE)
-- Flow accumulation: WWF/HydroSHEDS/30ACC (GEE)
+### Step 3 — Label Preparation [MEDIUM]
+File: gee/03_label_export.js
+Goal: SAR flood mask display + guide for manual digitizing of sample points.
+User action required: manually digitize 500 flooded + 500 non-flooded points.
+Exports: Flooded_Points.shp, NonFlooded_Points.shp, samplepoints_merged.csv
+Run after: Step 2 confirmed. Exports only after manual digitizing is done.
 
-### Step 3 — Label Preparation [10 marks]
-- Load Sentinel-1 SAR flood imagery in GEE
-- Identify flooded areas visually or with threshold
-- Allocate 500 flooded sample points (Label = 1)
-- Allocate 500 non-flooded sample points (Label = 0)
-- Export: Flooded_Points.shp, NonFlooded_Points.shp
-- Merge into: samplepoints.shp (with Label column)
+### Step 4 — Feature Layers [HEAVY]
+File: gee/04_feature_layers.js
+Goal: Export all 15 flood susceptibility feature rasters at 100m.
+15 features:
+  1.  Elevation      (SRTM DEM)
+  2.  Slope          (from DEM)
+  3.  Aspect         (from DEM)
+  4.  Hillshade      (from DEM)
+  5.  Flow Accumulation (HydroSHEDS)
+  6.  Distance to Rivers (HydroSHEDS + fastDistanceTransform)
+  7.  TWI            (ln(FlowAcc / tan(Slope)))
+  8.  Drainage Density (HydroSHEDS kernel)
+  9.  Rainfall       (CHIRPS 2015-2020 annual mean)
+  10. NDVI           (Sentinel-2 median 2020-2021)
+  11. Land Cover     (ESA WorldCover 2021)
+  12. Surface Water  (JRC GSW occurrence)
+  13. Curvature      (Laplacian of slope)
+  14. Population Density (WorldPop 2020)
+  15. Distance to Roads (placeholder — see TODO.md)
+Run after: Steps 1-3 confirmed. Run exports in batches if quota is low.
 
-### Step 4 — Feature Preparation [10 marks]
-Prepare 15 flood susceptibility raster layers at 100m resolution:
-1.  Elevation          (SRTM DEM)
-2.  Slope              (derived from DEM)
-3.  Aspect             (derived from DEM)
-4.  TWI                (Topographic Wetness Index = ln(flow_acc/tan(slope)))
-5.  Flow Accumulation  (HydroSHEDS)
-6.  Distance to Rivers (HydroSHEDS + fastDistanceTransform)
-7.  Drainage Density   (HydroSHEDS stream density)
-8.  Rainfall           (CHIRPS annual mean)
-9.  NDVI               (Sentinel-2 normalizedDifference B8/B4)
-10. Land Cover         (ESA WorldCover)
-11. Curvature          (from DEM)
-12. Surface Water      (JRC GSW occurrence)
-13. Distance to Roads  (OSM roads rasterized)
-14. Hillshade          (from DEM)
-15. Population Density (WorldPop or settlements proxy)
+### Step 5 — Full AOI Export [HEAVY]
+File: gee/05_full_aoi_export.js
+Goal: Sample full Karabük Province at 100m (~40,000 points) for prediction.
+Exports: Full_AOI_100m.csv to GIS_Flood_Karabuk.
+Run after: ALL 15 feature exports from Step 4 confirmed Done.
+Run alone on a fresh quota day.
 
-### Step 5 — Training Dataset Preparation [10 marks]
-- Stack all 15 feature rasters in GEE
-- Sample feature values at 1000 labeled points
-- Export as CSV
-- Clean in Python: drop .geo, system:index, latitude, longitude
-- Save: Inputs.txt (15 columns, no header)
-- Save: Label.txt  (1 column: 1 or 0, no header)
+### Step 6 — Data Preparation [Colab]
+File: colab/01_data_preparation.ipynb
+Goal: Load GEE CSV, clean, save Inputs.txt and Label.txt.
+Labels: 1 = flooded, 0 = non-flooded.
 
-### Step 6 — Machine Learning [10 marks]
-Train 3 classifiers, each with 2 parameter sets:
+### Step 7 — Machine Learning [Colab]
+File: colab/02_model_training.ipynb
+Goal: Train 3 classifiers, evaluate, compare, save best model.
+Classifiers: Random Forest, XGBoost, SVM.
+Metrics: Accuracy, Precision, Recall, F1, AUC-ROC, Confusion Matrix.
 
-Classifier 1: Random Forest
-- Why: robust, no scaling needed, gives feature importance
-- Library: sklearn.ensemble.RandomForestClassifier
-- Key params: n_estimators, max_depth, min_samples_split
+### Step 8 — Susceptibility Mapping [Colab]
+File: colab/03_susceptibility_mapping.ipynb
+Goal: Apply best model to full AOI, generate flood probability raster.
+Output: Karabuk_Flood_Susceptibility_100m.tif
+Risk classes: 1=Very Low, 2=Low, 3=Medium, 4=High, 5=Very High
 
-Classifier 2: XGBoost
-- Why: state-of-the-art accuracy, handles imbalance well
-- Library: xgboost.XGBClassifier
-- Key params: n_estimators, learning_rate, max_depth
-
-Classifier 3: Support Vector Machine (SVM)
-- Why: strong theoretical foundation, works well with scaled features
-- Library: sklearn.svm.SVC (probability=True)
-- Key params: C, gamma, kernel
-- Note: requires StandardScaler preprocessing
-
-Evaluation metrics per model:
-- Accuracy (train + test)
-- Precision, Recall, F1-score
-- AUC-ROC
-- Confusion matrix
-
-### Step 7 — Model Comparison and Selection
-- Build comparison table (DataFrame)
-- Plot ROC curves for all 3 models
-- Select best model based on AUC-ROC and F1
-- Justify selection in report
-- Save best model: joblib.dump(model, 'outputs/models/best_flood_model.pkl')
-
-### Step 8 — Flood Susceptibility Mapping [10 marks]
-- Load Full_Point_Dataset_100m.csv (full Karabük AOI)
-- Clean (same drops as training data)
-- Load best model
-- Predict: flood_prob = model.predict_proba(X)[:,1]
-- Save: Karabuk_Flood_Probability.shp (GeoDataFrame)
-- Rasterize: Karabuk_Flood_Susceptibility_100m.tif
-  CRS: EPSG:32636, resolution: 100m
-- Classify into 5 risk classes:
-  1 = Very Low  (prob 0.0–0.2) — green
-  2 = Low       (prob 0.2–0.4) — light green
-  3 = Medium    (prob 0.4–0.6) — yellow
-  4 = High      (prob 0.6–0.8) — orange
-  5 = Very High (prob 0.8–1.0) — red
-
-### Step 9 — Web GIS Decision-Support System [30 marks]
-Platform: Leaflet.js (single HTML file, no server needed)
+### Step 9 — Web GIS App [Leaflet]
 File: web/index.html
+Goal: Interactive flood susceptibility map for Karabük.
+Platform: Leaflet 1.9.4, single HTML file, no server needed.
+Features: susceptibility layer, legend, layer toggles, popups, rainfall slider.
 
-Required features:
-- Interactive Leaflet map centered on Karabük (lat: 41.2, lng: 32.6, zoom: 10)
-- Flood susceptibility layer (color by risk class)
-- Risk legend (5 classes with color swatches)
-- Layer control (susceptibility on/off, rivers, admin boundary)
-- Clickable popups (risk class, probability %, coordinates)
-- Title and info panel
-
-Optional features (bonus):
-- Rainfall scenario slider
-- Area-of-interest drawing tool
-
-### Step 10 — Report and Submission
-- Comprehensive written report (all methodology, results, discussion)
-- Cartographic map layout following Chapter 8 standards:
-  north arrow, scale bar, legend, neatline, locator map
-- All figures: feature maps, confusion matrices, ROC curves, susceptibility map
-- Web app screenshots
-- All code in appendix
+### Step 10 — Report
+File: report/CME434_Flood_Report.docx
+Goal: Comprehensive report covering all methodology, results, discussion.
+Standard: Follow doctor's Chapter 8 cartographic standards for maps.
 
 ---
 
 ## FOLDER PURPOSE REFERENCE
 
-data/raw/          → GEE-exported files (CSV, TIF, SHP) — do not modify
-data/processed/    → cleaned Python outputs (Inputs.txt, Label.txt, etc.)
-data/sample_points/→ label shapefiles (Flooded_Points.shp, etc.)
-gee/               → GEE JavaScript scripts (.js files)
-colab/             → Python/Jupyter notebooks (.ipynb files)
-scripts/           → utility Python scripts
-web/               → Leaflet web app (index.html + data/)
-report/            → report document and figures
-outputs/maps/      → exported map images and GeoTIFFs
-outputs/models/    → saved ML models (.pkl files)
-outputs/figures/   → charts, confusion matrices, ROC curves
-docs/              → project documentation
-
----
-
-## WHEN IMPLEMENTING CODE
-
-GEE scripts (.js files):
-- Use JavaScript syntax
-- Always define 'aoi' as Karabük Province boundary
-- Use same Export.table.toDrive / Export.image.toDrive pattern
-- Add clear TODO comments for user-specific values
-- Never hardcode project IDs
-
-Python notebooks (.ipynb):
-- Use markdown cells for section headers
-- Include expected output in comments
-- Handle NaN and missing values explicitly
-- Save all outputs to correct subfolders
-
-Web app (index.html):
-- Must work by opening directly in browser (no server)
-- Use Leaflet 1.9.4 from cdnjs.cloudflare.com
-- Load GeoJSON from data/ subfolder
-- All CSS and JS in one file
-
----
-
-## TERMINOLOGY GUIDE
-
-Always use flood terminology, never wildfire terminology:
-
-| Never write      | Always write          |
-|------------------|-----------------------|
-| burned points    | flooded points        |
-| unburned points  | non-flooded points    |
-| fire probability | flood probability     |
-| fire risk        | flood susceptibility  |
-| wildfire map     | flood susceptibility map |
-| Propability      | FloodProb (correct spelling) |
+data/raw/           → GEE-exported files — do not modify
+data/processed/     → Inputs.txt, Label.txt, cleaned CSVs
+data/sample_points/ → Flooded_Points.shp, NonFlooded_Points.shp
+data/output/        → Probability shp and tif outputs
+gee/                → GEE JavaScript scripts (.js) — paste into GEE manually
+colab/              → Python Jupyter notebooks (.ipynb)
+scripts/            → Utility Python scripts
+web/                → Leaflet web app (index.html)
+report/             → Report document and figures
+outputs/maps/       → Exported map images and GeoTIFFs
+outputs/models/     → Saved ML models (.pkl files)
+outputs/figures/    → Charts, confusion matrices, ROC curves
+docs/               → All project documentation

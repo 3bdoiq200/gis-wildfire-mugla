@@ -12,8 +12,8 @@
 // ============================================================
 
 // --- 1. Load AOI (Karabuk province, FAO GAUL spelling) ---
-var aoi = ee.FeatureCollection("FAO/GAUL/2015/level2")
-  .filter(ee.Filter.eq("ADM2_NAME", "Karabuk"))
+var aoi = ee.FeatureCollection("FAO/GAUL/2015/level1")
+  .filter(ee.Filter.eq("ADM1_NAME", "Karabuk"))
   .geometry();
 
 Map.centerObject(aoi, 10);

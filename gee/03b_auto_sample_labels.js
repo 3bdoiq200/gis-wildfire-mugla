@@ -28,10 +28,10 @@ var s1 = ee.ImageCollection("COPERNICUS/S1_GRD")
 
 // --- 3. Define Before / After date windows ---
 // Adjust these dates to match the actual Karabuk flood event
-var beforeStart = "2024-10-01";
-var beforeEnd   = "2024-11-01";
-var afterStart  = "2024-11-01";
-var afterEnd    = "2024-12-01";
+var beforeStart = "2021-07-01";
+var beforeEnd   = "2021-08-10";
+var afterStart  = "2021-08-11";
+var afterEnd    = "2021-09-15";
 
 var before = s1.filterDate(beforeStart, beforeEnd).mean().clip(aoi);
 var after  = s1.filterDate(afterStart,  afterEnd ).mean().clip(aoi);
@@ -42,8 +42,8 @@ var diff = after.subtract(before).rename("diff");
 
 // --- 5. Define flood / no-flood masks ---
 // Tune FLOOD_THRESHOLD if too many / too few points are sampled
-var FLOOD_THRESHOLD   = -3;  // dB drop = likely flooded
-var NOFLOOD_THRESHOLD =  1;  // dB gain or stable = not flooded
+var FLOOD_THRESHOLD   = -1.5;  // dB drop = likely flooded
+var NOFLOOD_THRESHOLD =  0.5;  // dB gain or stable = not flooded
 
 var floodMask   = diff.lt(FLOOD_THRESHOLD).selfMask();
 var nofloodMask = diff.gt(NOFLOOD_THRESHOLD).selfMask();

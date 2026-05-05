@@ -71,7 +71,7 @@ var rainfall = ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
 
 // Soil moisture from SMAP
 var soilMoisture = ee.ImageCollection("NASA_USDA/HSL/SMAP10KM_soil_moisture")
-  .filterDate("2025-05-01","2025-06-20")
+  .filterDate("2023-01-01","2024-12-31")
   .select("ssm").mean().clip(aoi).rename("soil_moisture");
 
 // Distance to urban (MODIS land cover)

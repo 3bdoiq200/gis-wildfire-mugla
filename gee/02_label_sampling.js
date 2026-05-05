@@ -32,9 +32,12 @@ var s2before = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
   .map(maskS2clouds).median().clip(aoi);
 
 var s2after = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-  .filterBounds(aoi).filterDate("2025-08-15","2025-09-30")
-  .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE",20))
-  .map(maskS2clouds).median().clip(aoi);
+  .filterBounds(aoi).filterDate("2025-07-01","2025-09-30")
+  .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE",30))
+  .map(maskS2clouds)
+  .sort("CLOUDY_PIXEL_PERCENTAGE")
+  .median()
+  .clip(aoi);
 
 var nbrBefore = s2before.normalizedDifference(["B8","B12"]).rename("NBR_before");
 var nbrAfter  = s2after.normalizedDifference(["B8","B12"]).rename("NBR_after");
@@ -46,7 +49,7 @@ print("dNBR min/max/mean:", dNBR.reduceRegion({
   geometry: aoi, scale: 100, maxPixels: 1e9
 }));
 
-var BURN_THRESHOLD = 0.15;
+var BURN_THRESHOLD = 0.10;
 var UNBURN_MIN = -0.1;
 var UNBURN_MAX =  0.1;
 
@@ -62,7 +65,7 @@ print("Unburned (-0.1 < dNBR < 0.1):", unburnedMask.reduceRegion({
 }));
 
 var burnedPoints = burnedMask
-  .sample({region: aoi, scale: 30, numPixels: 500, seed: 42, geometries: true})
+  .sample({region: aoi, scale: 20, numPixels: 500, seed: 42, geometries: true})
   .map(function(f) { return f.set("label", 1); });
 
 var unburnedPoints = unburnedMask

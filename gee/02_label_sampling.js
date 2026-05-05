@@ -46,7 +46,7 @@ print("dNBR min/max/mean:", dNBR.reduceRegion({
   geometry: aoi, scale: 100, maxPixels: 1e9
 }));
 
-var BURN_THRESHOLD = 0.20;
+var BURN_THRESHOLD = 0.15;
 var UNBURN_MIN = -0.1;
 var UNBURN_MAX =  0.1;
 
@@ -62,7 +62,7 @@ print("Unburned (-0.1 < dNBR < 0.1):", unburnedMask.reduceRegion({
 }));
 
 var burnedPoints = burnedMask
-  .sample({region: aoi, scale: 100, numPixels: 500, seed: 42, geometries: true})
+  .sample({region: aoi, scale: 30, numPixels: 500, seed: 42, geometries: true})
   .map(function(f) { return f.set("label", 1); });
 
 var unburnedPoints = unburnedMask

@@ -56,9 +56,10 @@ var lst = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
 
 // Wind speed from ERA5
 var wind = ee.ImageCollection("ECMWF/ERA5/MONTHLY")
-  .filterDate("2025-05-01","2025-06-01")
+  .filterBounds(aoi)
+  .filterDate("2025-01-01","2025-06-01")
   .select(["u_component_of_wind_10m","v_component_of_wind_10m"])
-  .first();
+  .mean();
 var windSpeed = wind.select("u_component_of_wind_10m").pow(2)
   .add(wind.select("v_component_of_wind_10m").pow(2))
   .sqrt().clip(aoi).rename("wind_speed");

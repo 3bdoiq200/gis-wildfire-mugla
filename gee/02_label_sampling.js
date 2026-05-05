@@ -32,7 +32,7 @@ var s2before = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
   .map(maskS2clouds).median().clip(aoi);
 
 var s2after = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-  .filterBounds(aoi).filterDate("2025-09-01","2025-09-30")
+  .filterBounds(aoi).filterDate("2025-08-15","2025-09-30")
   .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE",20))
   .map(maskS2clouds).median().clip(aoi);
 
@@ -46,7 +46,7 @@ print("dNBR min/max/mean:", dNBR.reduceRegion({
   geometry: aoi, scale: 100, maxPixels: 1e9
 }));
 
-var BURN_THRESHOLD = 0.27;
+var BURN_THRESHOLD = 0.20;
 var UNBURN_MIN = -0.1;
 var UNBURN_MAX =  0.1;
 

@@ -6,7 +6,7 @@
 // SAMPLING PHILOSOPHY:
 // Labels derived from dNBR (differenced Normalized Burn Ratio),
 // the USGS standard index for burn severity mapping.
-// Burned = dNBR > 0.27 (moderate-high severity, USGS classification)
+// Burned = dNBR > 0.15 (low-moderate severity threshold for Mugla 2025)
 // Unburned = stable pixels: -0.1 < dNBR < 0.1
 // Quality over quantity — no fake labels.
 // ============================================================
@@ -54,7 +54,7 @@ var burnedMask   = dNBR.gt(BURN_THRESHOLD).selfMask();
 var unburnedMask = dNBR.gt(UNBURN_MIN).and(dNBR.lt(UNBURN_MAX)).selfMask();
 
 print("=== Available Pixels ===");
-print("Burned (dNBR > 0.27):", burnedMask.reduceRegion({
+print("Burned (dNBR > 0.15):", burnedMask.reduceRegion({
   reducer: ee.Reducer.count(), geometry: aoi, scale: 100, maxPixels: 1e9
 }));
 print("Unburned (-0.1 < dNBR < 0.1):", unburnedMask.reduceRegion({

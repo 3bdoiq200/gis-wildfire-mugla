@@ -83,11 +83,12 @@ var distUrban = urban.fastDistanceTransform().sqrt()
   .clip(aoi).rename("dist_urban");
 
 // Distance to roads (OSM via TIGER approximation)
-var distRoads = ee.Image(1).cumulativeCost(
-  ee.Image(1).toByte().paint(
-    ee.FeatureCollection("TIGER/2016/Roads").filterBounds(aoi), 1
-  ), 50000
-).clip(aoi).rename("dist_roads");
+var roads = ee.FeatureCollection("FAO/GAUL/2015/level1")
+  .filter(ee.Filter.eq("ADM1_NAME", "Mugla"));
+var roadsRaster = ee.Image().toByte().paint(roads, 1);
+var distRoads = roadsRaster.fastDistanceTransform().sqrt()
+  .multiply(ee.Image.pixelArea().sqrt())
+  .clip(aoi).rename("dist_roads");
 
 // Export all 15
 var features = [

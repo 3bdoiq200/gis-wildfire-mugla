@@ -70,9 +70,13 @@ var rainfall = ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
   .sum().clip(aoi).rename("rainfall");
 
 // Soil moisture from SMAP
-var soilMoisture = ee.ImageCollection("NASA_USDA/HSL/SMAP10KM_soil_moisture")
+var soilMoisture = ee.ImageCollection("NASA/SMAP/SPL4SMGP/007")
+  .filterBounds(aoi)
   .filterDate("2023-01-01","2024-12-31")
-  .select("ssm").mean().clip(aoi).rename("soil_moisture");
+  .select("sm_surface")
+  .mean()
+  .clip(aoi)
+  .rename("soil_moisture");
 
 // Distance to urban (MODIS land cover)
 var urban = ee.ImageCollection("MODIS/006/MCD12Q1")

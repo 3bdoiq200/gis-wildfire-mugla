@@ -890,6 +890,13 @@
           <div class="data-source"><i class="fa-solid fa-droplet"></i> OpenLandMap Soil Moisture</div>
           <div class="data-source"><i class="fa-solid fa-tree"></i> MODIS Land Cover</div>
           <div class="data-source"><i class="fa-solid fa-thermometer-half"></i> MODIS LST (Land Surface Temp)</div>
+          <div class="data-source"><i class="fa-solid fa-border-all"></i> FAO GAUL 2015 — Province Boundary</div>
+          <div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:5px;border-left:2px solid var(--text-muted);font-size:11px;color:var(--text-muted);line-height:1.7;">
+            <strong style="color:var(--text);">Boundary note:</strong> Province boundary sourced from the
+            FAO GAUL 2015 global administrative dataset, exported from Google Earth Engine.
+            Slight deviations from official Turkish cadastral boundaries are expected and
+            do not affect the wildfire susceptibility analysis.
+          </div>
         </div>
 
         <div class="card">
@@ -1062,12 +1069,67 @@ var fallbackBoundaryCoords = [
   [37.42,27.22],[37.62,27.24],[37.82,27.26]
 ];
 
+// Ray-cast point-in-polygon for a single GeoJSON ring ([lon, lat] order)
+function pointInRing(lon, lat, ring) {
+  var inside = false;
+  for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > lat) !== (yj > lat)) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+// Returns true if [lat, lon] lies inside any exterior ring of the FAO GAUL MultiPolygon
+function pointInMugla(lat, lon, geojson) {
+  if (!geojson) return true; // no boundary data → accept all
+  var geom = geojson.features[0].geometry;
+  var polys = geom.type === 'MultiPolygon' ? geom.coordinates : [geom.coordinates];
+  for (var p = 0; p < polys.length; p++) {
+    if (pointInRing(lon, lat, polys[p][0])) return true;
+  }
+  return false;
+}
+
+// Build and add markers after boundary is available so we can clip to it
+function addMarkersFiltered(geoData) {
+  var burnedGroup = L.layerGroup();
+  burnedPts.forEach(function(p) {
+    if (!pointInMugla(p.lat, p.lon, geoData)) return;
+    L.circleMarker([p.lat, p.lon], { radius:5, fillColor:'#ff4444', color:'#cc2200', weight:1.5, fillOpacity:0.8 })
+    .bindPopup(
+      '<div class="popup-title">&#x1F534; Burned Area</div>' +
+      '<div class="popup-row"><span class="popup-key">Label</span><span class="popup-val">1 (Burned)</span></div>' +
+      '<div class="popup-row"><span class="popup-key">dNBR</span><span class="popup-val">'+p.dnbr+'</span></div>' +
+      '<div class="popup-row"><span class="popup-key">Risk Level</span><span class="popup-val">'+p.risk+'</span></div>' +
+      '<div class="popup-row"><span class="popup-key">Coordinates</span><span class="popup-val">'+p.lat.toFixed(4)+', '+p.lon.toFixed(4)+'</span></div>'
+    ).addTo(burnedGroup);
+  });
+  layers.burned = burnedGroup;
+  if (layerVisible.burned) layers.burned.addTo(map);
+
+  var unburnedGroup = L.layerGroup();
+  unburnedPts.forEach(function(p) {
+    if (!pointInMugla(p.lat, p.lon, geoData)) return;
+    L.circleMarker([p.lat, p.lon], { radius:4, fillColor:'#44cc44', color:'#1a7a1a', weight:1.5, fillOpacity:0.7 })
+    .bindPopup(
+      '<div class="popup-title">&#x1F7E2; Stable / Unburned</div>' +
+      '<div class="popup-row"><span class="popup-key">Label</span><span class="popup-val">0 (Unburned)</span></div>' +
+      '<div class="popup-row"><span class="popup-key">dNBR</span><span class="popup-val">'+p.dnbr+'</span></div>' +
+      '<div class="popup-row"><span class="popup-key">Risk Level</span><span class="popup-val">'+p.risk+'</span></div>' +
+      '<div class="popup-row"><span class="popup-key">Coordinates</span><span class="popup-val">'+p.lat.toFixed(4)+', '+p.lon.toFixed(4)+'</span></div>'
+    ).addTo(unburnedGroup);
+  });
+  layers.unburned = unburnedGroup;
+  if (layerVisible.unburned) layers.unburned.addTo(map);
+}
+
 function addBoundaryLayer(geoData) {
   layers.boundary = geoData
     ? L.geoJSON(geoData, { style: { color:'#ff4444', weight:2.5, fillOpacity:0.05, dashArray:'8,4', fillColor:'#ff6666' } })
     : L.polygon(fallbackBoundaryCoords, { color:'#ff4444', weight:2.5, fillColor:'#ff4444', fillOpacity:0.04, dashArray:'8,4' });
   layers.boundary.bindTooltip('Muğla Province (FAO GAUL)', { permanent: false });
   if (layerVisible.boundary) layers.boundary.addTo(map);
+  addMarkersFiltered(geoData);
 }
 
 fetch('mugla_boundary.geojson')
@@ -1128,44 +1190,36 @@ function toggleFIRMS() {
   else { firmsLayer.addTo(map); firmsActive = true; }
 }
 
-// ── Burned markers (61 points)
-var burnedGroup = L.layerGroup();
-burnedPts.forEach(function(p) {
-  L.circleMarker([p.lat, p.lon], { radius:5, fillColor:'#ff4444', color:'#cc2200', weight:1.5, fillOpacity:0.8 })
-  .bindPopup(
-    '<div class="popup-title">&#x1F534; Burned Area</div>' +
-    '<div class="popup-row"><span class="popup-key">Label</span><span class="popup-val">1 (Burned)</span></div>' +
-    '<div class="popup-row"><span class="popup-key">dNBR</span><span class="popup-val">'+p.dnbr+'</span></div>' +
-    '<div class="popup-row"><span class="popup-key">Risk Level</span><span class="popup-val">'+p.risk+'</span></div>' +
-    '<div class="popup-row"><span class="popup-key">Coordinates</span><span class="popup-val">'+p.lat.toFixed(4)+', '+p.lon.toFixed(4)+'</span></div>'
-  ).addTo(burnedGroup);
+// ── Before overlay: full Muğla extent, green tint — pre-fire vegetation reference
+layers.before = L.rectangle([[36.4,27.1],[37.95,29.9]], {
+  color:'#2ecc71', weight:1.5, fillColor:'#2ecc71', fillOpacity:0.10, dashArray:'6,3'
+}).bindTooltip(
+  '<div style="font-family:Inter,sans-serif;font-size:12px;text-align:center;padding:4px;">' +
+  '<strong style="color:#2ecc71;">Pre-fire vegetation — May 2025</strong><br>' +
+  'NDVI healthy &bull; Sentinel-2 SR imagery<br>' +
+  '<em style="color:#aaa;font-size:10px;">Pre-fire reference period (Jun&ndash;Aug 2025 event)</em></div>',
+  { permanent:false, direction:'center' }
+);
+
+// ── After overlay: four coastal fire-affected zones only (Marmaris, Datça, Bodrum, Köyceğiz)
+var afterGroup = L.layerGroup();
+[
+  { bounds:[[36.68,27.95],[37.02,28.62]], name:'Marmaris' },
+  { bounds:[[36.50,27.35],[36.88,28.02]], name:'Datça' },
+  { bounds:[[36.88,27.15],[37.22,27.82]], name:'Bodrum' },
+  { bounds:[[36.80,28.38],[37.12,28.92]], name:'Köyceğiz' }
+].forEach(function(z) {
+  L.rectangle(z.bounds, {
+    color:'#c0392b', weight:1.5, fillColor:'#e67e22', fillOpacity:0.22, dashArray:'5,3'
+  }).bindTooltip(
+    '<div style="font-family:Inter,sans-serif;font-size:12px;text-align:center;padding:4px;">' +
+    '<strong style="color:#e67e22;">Post-fire scar — Sep 2025</strong><br>' +
+    z.name + ' fire zone &bull; dNBR &gt; 0.15<br>' +
+    '<em style="color:#aaa;font-size:10px;">Burned vegetation detected (Sentinel-2)</em></div>',
+    { permanent:false, direction:'center' }
+  ).addTo(afterGroup);
 });
-layers.burned = burnedGroup;
-layers.burned.addTo(map);
-
-// ── Unburned markers (441 points)
-var unburnedGroup = L.layerGroup();
-unburnedPts.forEach(function(p) {
-  L.circleMarker([p.lat, p.lon], { radius:4, fillColor:'#44cc44', color:'#1a7a1a', weight:1.5, fillOpacity:0.7 })
-  .bindPopup(
-    '<div class="popup-title">&#x1F7E2; Stable / Unburned</div>' +
-    '<div class="popup-row"><span class="popup-key">Label</span><span class="popup-val">0 (Unburned)</span></div>' +
-    '<div class="popup-row"><span class="popup-key">dNBR</span><span class="popup-val">'+p.dnbr+'</span></div>' +
-    '<div class="popup-row"><span class="popup-key">Risk Level</span><span class="popup-val">'+p.risk+'</span></div>' +
-    '<div class="popup-row"><span class="popup-key">Coordinates</span><span class="popup-val">'+p.lat.toFixed(4)+', '+p.lon.toFixed(4)+'</span></div>'
-  ).addTo(unburnedGroup);
-});
-layers.unburned = unburnedGroup;
-layers.unburned.addTo(map);
-
-// ── Before / After overlays
-layers.before = L.rectangle([[36.5,27.2],[37.8,29.8]], {
-  color:'#2ecc71', weight:0, fillColor:'#2ecc71', fillOpacity:0.12
-}).bindTooltip('Before Wildfire — May 2025', { permanent:true, direction:'center' });
-
-layers.after = L.rectangle([[36.5,27.2],[37.8,29.8]], {
-  color:'#e67e22', weight:0, fillColor:'#e67e22', fillOpacity:0.15
-}).bindTooltip('After Wildfire — Sep 2025', { permanent:true, direction:'center' });
+layers.after = afterGroup;
 
 // ── Wire up main layer toggle buttons (use layer registry)
 document.getElementById('tog-burned').onclick   = function() { toggleLayer('burned'); };

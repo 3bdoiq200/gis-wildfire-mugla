@@ -1159,6 +1159,63 @@ function convexHull(pts) {
   return hull;
 }
 
+// Concave hull — starts with convex hull then iteratively "digs"
+// interior points into long edges until every edge is ≤ maxEdge degrees.
+// pts: [{lat, lon}, …]   maxEdge: max edge length in degrees (≈111 km/°)
+function concaveHull(pts, maxEdge) {
+  if (pts.length < 3) return convexHull(pts);
+
+  // ── Build initial convex hull and split pts into hull vs interior
+  var ring0   = convexHull(pts);            // [[lon,lat],…, close]
+  var hullArr = ring0.slice(0, -1);          // open ring [[lon,lat],…]
+
+  // Track which source pts are already on the hull
+  var onHull = pts.filter(function(p) {
+    return hullArr.some(function(h) {
+      return Math.abs(h[0]-p.lon)<1e-9 && Math.abs(h[1]-p.lat)<1e-9;
+    });
+  });
+  var interior = pts.filter(function(p) { return onHull.indexOf(p) < 0; });
+
+  // Working hull as mutable array of {lon, lat}
+  var hull = hullArr.map(function(c){ return {lon:c[0], lat:c[1]}; });
+
+  // ── Iteratively insert interior points into long edges
+  var maxIter = (pts.length + 1) * 4;
+  for (var iter = 0; iter < maxIter; iter++) {
+    var inserted = false;
+    for (var i = 0; i < hull.length && !inserted; i++) {
+      var a   = hull[i];
+      var b   = hull[(i + 1) % hull.length];
+      var len = Math.hypot(b.lat - a.lat, b.lon - a.lon);
+      if (len <= maxEdge) continue;
+
+      // Find interior point closest to the midpoint of this long edge
+      var mLat = (a.lat + b.lat) / 2;
+      var mLon = (a.lon + b.lon) / 2;
+      var best = null, bestD = Infinity;
+      interior.forEach(function(p) {
+        var d = Math.hypot(p.lat - mLat, p.lon - mLon);
+        if (d < bestD) { bestD = d; best = p; }
+      });
+
+      // Only insert if the candidate is closer to the midpoint than
+      // either endpoint (it actually digs inward, not outward)
+      if (best && bestD < len * 0.8) {
+        hull.splice(i + 1, 0, { lat: best.lat, lon: best.lon });
+        interior.splice(interior.indexOf(best), 1);
+        inserted = true;
+      }
+    }
+    if (!inserted) break;
+  }
+
+  // ── Convert back to closed GeoJSON ring [[lon,lat],…,first]
+  var ring = hull.map(function(p){ return [p.lon, p.lat]; });
+  ring.push(ring[0]);
+  return ring;
+}
+
 function addBoundaryLayer(geoData) {
   // ── Province boundary
   layers.boundary = geoData
@@ -1216,7 +1273,7 @@ function addBoundaryLayer(geoData) {
   ];
   var afterFeatures = [];
   burnZones.forEach(function(z) {
-    var ring = convexHull(z.pts);
+    var ring = concaveHull(z.pts, 0.10);
     if (ring.length < 4) return;
     var clipped = clipRingToBoundary(ring, geoData); // remove any sea portions
     if (!clipped || clipped.length < 4) return;

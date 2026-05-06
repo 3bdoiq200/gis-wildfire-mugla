@@ -1123,26 +1123,92 @@ function addMarkersFiltered(geoData) {
   if (layerVisible.unburned) layers.unburned.addTo(map);
 }
 
+// Gift-wrapping convex hull — pts as [{lat,lon}], returns closed GeoJSON ring [[lon,lat],…]
+function convexHull(pts) {
+  var coords = pts.map(function(p) { return [p.lon, p.lat]; });
+  var n = coords.length;
+  if (n < 3) return coords.concat([coords[0]]);
+  var start = 0;
+  for (var i = 1; i < n; i++) if (coords[i][0] < coords[start][0]) start = i;
+  var hull = [], cur = start, guard = 0;
+  do {
+    hull.push(coords[cur]);
+    var nxt = (cur + 1) % n;
+    for (var j = 0; j < n; j++) {
+      var cross = (coords[nxt][0]-coords[cur][0])*(coords[j][1]-coords[cur][1])
+                - (coords[nxt][1]-coords[cur][1])*(coords[j][0]-coords[cur][0]);
+      if (cross < 0) nxt = j;
+    }
+    cur = nxt;
+    if (++guard > n + 2) break;
+  } while (cur !== start);
+  hull.push(hull[0]);
+  return hull;
+}
+
 function addBoundaryLayer(geoData) {
+  // ── Province boundary
   layers.boundary = geoData
     ? L.geoJSON(geoData, { style: { color:'#ff4444', weight:2.5, fillOpacity:0.05, dashArray:'8,4', fillColor:'#ff6666' } })
     : L.polygon(fallbackBoundaryCoords, { color:'#ff4444', weight:2.5, fillColor:'#ff4444', fillOpacity:0.04, dashArray:'8,4' });
   layers.boundary.bindTooltip('Muğla Province (FAO GAUL)', { permanent: false });
   if (layerVisible.boundary) layers.boundary.addTo(map);
+
+  // ── Sample markers clipped to boundary
   addMarkersFiltered(geoData);
+
+  // ── Heatmap — boundary-clipped, radius 15
+  var filteredHeat = heatData.filter(function(p) { return pointInMugla(p[0], p[1], geoData); });
+  layers.heatmap = L.heatLayer(filteredHeat, {
+    radius: 15, blur: 18, maxZoom: 12, max: 1.0,
+    gradient: { 0.2:'#1a9850', 0.4:'#91cf60', 0.6:'#fee08b', 0.8:'#fc8d59', 1.0:'#d73027' }
+  });
+  if (layerVisible.heatmap) layers.heatmap.addTo(map);
+
+  // ── Before overlay: same FAO GAUL shape, green tint (pre-fire NDVI reference)
+  layers.before = geoData
+    ? L.geoJSON(geoData, { style: { fillColor:'#2d8a2d', fillOpacity:0.25, color:'transparent', weight:0 } })
+    : L.rectangle([[36.4,27.1],[37.95,29.9]], { color:'transparent', weight:0, fillColor:'#2d8a2d', fillOpacity:0.22 });
+  layers.before.bindTooltip(
+    '<div style="font-family:Inter,sans-serif;font-size:12px;text-align:center;padding:4px;">' +
+    '<strong style="color:#4caf50;">Pre-fire vegetation state — May 2025</strong><br>' +
+    'Healthy NDVI &bull; Sentinel-2 SR imagery<br>' +
+    '<em style="color:#aaa;font-size:10px;">Reference period before Jun&ndash;Aug 2025 fires</em></div>',
+    { permanent:false, sticky:true }
+  );
+  // hidden by default — toggle via tog-before
+
+  // ── After overlay: convex-hull polygons around each burned cluster
+  var burnZones = [
+    { pts: burnedPts.slice(0,  20), name:'Marmaris'  },
+    { pts: burnedPts.slice(20, 35), name:'Datça'      },
+    { pts: burnedPts.slice(35, 47), name:'Köyceğiz'   },
+    { pts: burnedPts.slice(47, 55), name:'Bodrum'     },
+    { pts: burnedPts.slice(55, 61), name:'Fethiye'    }
+  ];
+  var afterFeatures = [];
+  burnZones.forEach(function(z) {
+    var ring = convexHull(z.pts);
+    if (ring.length < 4) return;
+    afterFeatures.push({ type:'Feature', properties:{ name:z.name }, geometry:{ type:'Polygon', coordinates:[ring] } });
+  });
+  layers.after = L.geoJSON(
+    { type:'FeatureCollection', features:afterFeatures },
+    { style: { fillColor:'#cc5500', fillOpacity:0.30, color:'transparent', weight:0 } }
+  ).bindTooltip(
+    '<div style="font-family:Inter,sans-serif;font-size:12px;text-align:center;padding:4px;">' +
+    '<strong style="color:#ff7733;">Post-fire burned areas — Sep 2025</strong><br>' +
+    'dNBR &gt; 0.15 detected &bull; Sentinel-2 SR<br>' +
+    '<em style="color:#aaa;font-size:10px;">Marmaris &bull; Datça &bull; K&ouml;yceğiz &bull; Bodrum &bull; Fethiye</em></div>',
+    { permanent:false, sticky:true }
+  );
+  // hidden by default — toggle via tog-after
 }
 
 fetch('mugla_boundary.geojson')
   .then(function(r) { return r.json(); })
   .then(function(d) { addBoundaryLayer(d); })
   .catch(function()  { addBoundaryLayer(null); });
-
-// ── Heatmap
-layers.heatmap = L.heatLayer(heatData, {
-  radius: 25, blur: 20, maxZoom: 12, max: 1.0,
-  gradient: { 0.2:'#1a9850', 0.4:'#91cf60', 0.6:'#fee08b', 0.8:'#fc8d59', 1.0:'#d73027' }
-});
-layers.heatmap.addTo(map);
 
 // ── Legend
 var legend = L.control({position: 'bottomright'});
@@ -1189,37 +1255,6 @@ function toggleFIRMS() {
   if (firmsActive) { map.removeLayer(firmsLayer); firmsActive = false; }
   else { firmsLayer.addTo(map); firmsActive = true; }
 }
-
-// ── Before overlay: full Muğla extent, green tint — pre-fire vegetation reference
-layers.before = L.rectangle([[36.4,27.1],[37.95,29.9]], {
-  color:'#2ecc71', weight:1.5, fillColor:'#2ecc71', fillOpacity:0.10, dashArray:'6,3'
-}).bindTooltip(
-  '<div style="font-family:Inter,sans-serif;font-size:12px;text-align:center;padding:4px;">' +
-  '<strong style="color:#2ecc71;">Pre-fire vegetation — May 2025</strong><br>' +
-  'NDVI healthy &bull; Sentinel-2 SR imagery<br>' +
-  '<em style="color:#aaa;font-size:10px;">Pre-fire reference period (Jun&ndash;Aug 2025 event)</em></div>',
-  { permanent:false, direction:'center' }
-);
-
-// ── After overlay: four coastal fire-affected zones only (Marmaris, Datça, Bodrum, Köyceğiz)
-var afterGroup = L.layerGroup();
-[
-  { bounds:[[36.68,27.95],[37.02,28.62]], name:'Marmaris' },
-  { bounds:[[36.50,27.35],[36.88,28.02]], name:'Datça' },
-  { bounds:[[36.88,27.15],[37.22,27.82]], name:'Bodrum' },
-  { bounds:[[36.80,28.38],[37.12,28.92]], name:'Köyceğiz' }
-].forEach(function(z) {
-  L.rectangle(z.bounds, {
-    color:'#c0392b', weight:1.5, fillColor:'#e67e22', fillOpacity:0.22, dashArray:'5,3'
-  }).bindTooltip(
-    '<div style="font-family:Inter,sans-serif;font-size:12px;text-align:center;padding:4px;">' +
-    '<strong style="color:#e67e22;">Post-fire scar — Sep 2025</strong><br>' +
-    z.name + ' fire zone &bull; dNBR &gt; 0.15<br>' +
-    '<em style="color:#aaa;font-size:10px;">Burned vegetation detected (Sentinel-2)</em></div>',
-    { permanent:false, direction:'center' }
-  ).addTo(afterGroup);
-});
-layers.after = afterGroup;
 
 // ── Wire up main layer toggle buttons (use layer registry)
 document.getElementById('tog-burned').onclick   = function() { toggleLayer('burned'); };
@@ -1344,8 +1379,7 @@ document.getElementById('btn-terrain').onclick = function(){ switchBase('terrain
 // ── Opacity slider
 document.getElementById('opacity-slider').addEventListener('input', function() {
   document.getElementById('opacity-val').textContent = this.value + '%';
-  layers.heatmap.setOptions({ opacity: this.value/100 });
-  layers.heatmap.redraw();
+  if (layers.heatmap) { layers.heatmap.setOptions({ opacity: this.value/100 }); layers.heatmap.redraw(); }
 });
 
 // ── Threshold slider
@@ -1382,8 +1416,10 @@ document.getElementById('run-scenario-btn').addEventListener('click', function()
   document.getElementById('res-change').textContent = '+' + chg + '%';
   document.getElementById('res-cat').innerHTML      = '<span class="risk-badge '+cls+'">'+cat+'</span>';
   document.getElementById('scenario-result').style.display = 'block';
-  var newData = heatData.map(function(p){ return [p[0], p[1], Math.min(1.0, p[2]*total)]; });
-  layers.heatmap.setLatLngs(newData);
+  if (layers.heatmap) {
+    var newData = heatData.map(function(p){ return [p[0], p[1], Math.min(1.0, p[2]*total)]; });
+    layers.heatmap.setLatLngs(newData);
+  }
 });
 
 // ── Charts

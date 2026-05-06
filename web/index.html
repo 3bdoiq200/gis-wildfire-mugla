@@ -976,28 +976,8 @@ function toggleLayer(layerName) {
   }
 }
 
-// ── Heatmap data
-function gaussianPts(rng, lat, lon, radius, count, intensity) {
-  var pts = [];
-  for (var i = 0; i < count; i++) {
-    var r = radius * Math.sqrt(-2 * Math.log(rng() + 1e-10));
-    var theta = 2 * Math.PI * rng();
-    pts.push([lat + r * Math.sin(theta), lon + r * Math.cos(theta), intensity * (0.5 + rng() * 0.5)]);
-  }
-  return pts;
-}
-var rng = seededRng(42);
-var heatClusters = [
-  { lat: 36.85, lon: 28.27, r: 0.3,  n: 40, int: 0.8,  name: 'Marmaris' },
-  { lat: 37.03, lon: 27.43, r: 0.25, n: 35, int: 0.7,  name: 'Bodrum' },
-  { lat: 36.73, lon: 27.68, r: 0.2,  n: 25, int: 0.9,  name: 'Datça' },
-  { lat: 37.32, lon: 27.78, r: 0.2,  n: 30, int: 0.6,  name: 'Milas' },
-  { lat: 36.95, lon: 28.68, r: 0.2,  n: 25, int: 0.75, name: 'Köyceğiz' },
-  { lat: 36.65, lon: 29.12, r: 0.2,  n: 25, int: 0.65, name: 'Fethiye' }
-];
+// heatData is built inside addBoundaryLayer from actual burnedPts positions
 var heatData = [];
-heatClusters.forEach(function(c) { heatData = heatData.concat(gaussianPts(rng, c.lat, c.lon, c.r, c.n, c.int)); });
-for (var i = 0; i < 20; i++) { heatData.push([36.5 + rng() * 1.4, 27.2 + rng() * 2.2, 0.3 + rng() * 0.3]); }
 
 // ── 61 burned sample points (concentrated near actual fire zones)
 var burnedPts = [];
@@ -1123,6 +1103,39 @@ function addMarkersFiltered(geoData) {
   if (layerVisible.unburned) layers.unburned.addTo(map);
 }
 
+// Binary-search for the exact point where a hull edge crosses the province boundary.
+function findCrossing(a, b, geoData, aInside) {
+  var lo = a, hi = b;
+  for (var i = 0; i < 18; i++) {
+    var mid = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2];
+    var inM = pointInMugla(mid[1], mid[0], geoData);
+    if (inM === aInside) lo = mid; else hi = mid;
+  }
+  return [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2];
+}
+
+// Clip a closed GeoJSON ring ([[lon,lat],…,first]) against the Muğla boundary.
+function clipRingToBoundary(ring, geoData) {
+  if (!geoData || !ring || ring.length < 4) return ring;
+  var out = [];
+  var n = ring.length - 1;
+  for (var i = 0; i < n; i++) {
+    var curr = ring[i];
+    var next = ring[(i + 1) % n];
+    var cIn = pointInMugla(curr[1], curr[0], geoData);
+    var nIn = pointInMugla(next[1], next[0], geoData);
+    if (cIn) {
+      out.push(curr);
+      if (!nIn) out.push(findCrossing(curr, next, geoData, true));
+    } else {
+      if (nIn) out.push(findCrossing(curr, next, geoData, false));
+    }
+  }
+  if (out.length < 3) return null;
+  out.push(out[0]);
+  return out;
+}
+
 // Gift-wrapping convex hull — pts as [{lat,lon}], returns closed GeoJSON ring [[lon,lat],…]
 function convexHull(pts) {
   var coords = pts.map(function(p) { return [p.lon, p.lat]; });
@@ -1157,10 +1170,25 @@ function addBoundaryLayer(geoData) {
   // ── Sample markers clipped to boundary
   addMarkersFiltered(geoData);
 
-  // ── Heatmap — boundary-clipped, radius 15
-  var filteredHeat = heatData.filter(function(p) { return pointInMugla(p[0], p[1], geoData); });
-  layers.heatmap = L.heatLayer(filteredHeat, {
-    radius: 15, blur: 18, maxZoom: 12, max: 1.0,
+  // ── Heatmap — built directly from burned point positions so hotspots
+  //    align exactly with the red burned markers on the map.
+  var hRng = seededRng(42);
+  heatData = []; // fills the global so the scenario slider can rescale it
+  burnedPts.forEach(function(p) {
+    if (!pointInMugla(p.lat, p.lon, geoData)) return;
+    heatData.push([p.lat, p.lon, 1.0]);
+    for (var k = 0; k < 10; k++) {
+      var r     = 0.10 * Math.sqrt(-2 * Math.log(hRng() + 1e-10));
+      var theta = 2 * Math.PI * hRng();
+      var nlat  = p.lat + r * Math.sin(theta);
+      var nlon  = p.lon + r * Math.cos(theta);
+      if (pointInMugla(nlat, nlon, geoData)) {
+        heatData.push([nlat, nlon, 0.45 + hRng() * 0.45]);
+      }
+    }
+  });
+  layers.heatmap = L.heatLayer(heatData, {
+    radius: 28, blur: 22, maxZoom: 12, max: 1.0,
     gradient: { 0.2:'#1a9850', 0.4:'#91cf60', 0.6:'#fee08b', 0.8:'#fc8d59', 1.0:'#d73027' }
   });
   if (layerVisible.heatmap) layers.heatmap.addTo(map);
@@ -1190,7 +1218,9 @@ function addBoundaryLayer(geoData) {
   burnZones.forEach(function(z) {
     var ring = convexHull(z.pts);
     if (ring.length < 4) return;
-    afterFeatures.push({ type:'Feature', properties:{ name:z.name }, geometry:{ type:'Polygon', coordinates:[ring] } });
+    var clipped = clipRingToBoundary(ring, geoData); // remove any sea portions
+    if (!clipped || clipped.length < 4) return;
+    afterFeatures.push({ type:'Feature', properties:{ name:z.name }, geometry:{ type:'Polygon', coordinates:[clipped] } });
   });
   layers.after = L.geoJSON(
     { type:'FeatureCollection', features:afterFeatures },
@@ -1319,10 +1349,17 @@ document.getElementById('aoi-download').onclick = function() {
   a.href = URL.createObjectURL(blob); a.download = 'aoi_mugla.geojson'; a.click();
 };
 
-// ── Map click risk popup
+// ── Map click risk popup — fire zone centres used for proximity-based risk estimate
+var fireZoneCentres = [
+  { lat: 36.82, lon: 28.35, name: 'Marmaris'  },
+  { lat: 36.72, lon: 27.75, name: 'Datça'      },
+  { lat: 36.95, lon: 28.70, name: 'Köyceğiz'   },
+  { lat: 37.10, lon: 27.55, name: 'Bodrum'     },
+  { lat: 36.65, lon: 29.20, name: 'Fethiye'    }
+];
 function nearestCluster(lat, lon) {
-  var best = heatClusters[0], bestDist = 1e9;
-  heatClusters.forEach(function(c) { var d = Math.hypot(lat-c.lat, lon-c.lon); if (d < bestDist) { bestDist = d; best = c; } });
+  var best = fireZoneCentres[0], bestDist = 1e9;
+  fireZoneCentres.forEach(function(c) { var d = Math.hypot(lat-c.lat, lon-c.lon); if (d < bestDist) { bestDist = d; best = c; } });
   return { name: best.name, dist: bestDist };
 }
 function estimateRisk(lat, lon) {

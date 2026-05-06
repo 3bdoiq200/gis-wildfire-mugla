@@ -678,12 +678,15 @@
         <div class="card">
           <div class="card-title"><i class="fa-solid fa-database"></i> Training Data Summary</div>
           <div class="stats-grid">
-            <div class="stat-item"><div class="stat-val">326</div><div class="stat-label">Total Samples</div></div>
-            <div class="stat-item"><div class="stat-val" style="color:var(--very-high)">39</div><div class="stat-label">Burned (label=1)</div></div>
-            <div class="stat-item"><div class="stat-val" style="color:var(--very-low)">287</div><div class="stat-label">Unburned (label=0)</div></div>
-            <div class="stat-item"><div class="stat-val">15</div><div class="stat-label">Features Used</div></div>
+            <div class="stat-item"><div class="stat-val">502</div><div class="stat-label">Total Labeled</div></div>
+            <div class="stat-item"><div class="stat-val" style="color:var(--very-high)">61</div><div class="stat-label">Burned (label=1)</div></div>
+            <div class="stat-item"><div class="stat-val" style="color:var(--very-low)">441</div><div class="stat-label">Unburned (label=0)</div></div>
+            <div class="stat-item"><div class="stat-val">326</div><div class="stat-label">ML Training Set</div></div>
             <div class="stat-item"><div class="stat-val">80/20</div><div class="stat-label">Train/Test Split</div></div>
-            <div class="stat-item"><div class="stat-val">66</div><div class="stat-label">Test Samples</div></div>
+            <div class="stat-item"><div class="stat-val">15</div><div class="stat-label">Features Used</div></div>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:8px;text-align:center;">
+            502 total labeled points &nbsp;|&nbsp; 326 used for ML training (after NaN removal)
           </div>
         </div>
 
@@ -942,6 +945,31 @@ function seededRng(seed) {
   };
 }
 
+// ── Layer registry — all toggleable layers stored here
+var layers = { burned: null, unburned: null, heatmap: null, boundary: null, before: null, after: null };
+var layerVisible = { burned: true, unburned: true, heatmap: true, boundary: true, before: false, after: false };
+
+// Maps layer key → DOM element id
+var togIds = {
+  burned: 'tog-burned', unburned: 'tog-unburned', heatmap: 'tog-heat',
+  boundary: 'tog-boundary', before: 'tog-before', after: 'tog-after'
+};
+
+function toggleLayer(layerName) {
+  if (!layers[layerName]) return;
+  var el = document.getElementById(togIds[layerName]);
+  if (layerVisible[layerName]) {
+    map.removeLayer(layers[layerName]);
+    layerVisible[layerName] = false;
+    if (el) { el.classList.remove('on'); el.querySelector('.toggle-icon').className = 'fa-solid fa-eye-slash toggle-icon'; }
+  } else {
+    map.addLayer(layers[layerName]);
+    layerVisible[layerName] = true;
+    if (el) { el.classList.add('on'); el.querySelector('.toggle-icon').className = 'fa-solid fa-eye toggle-icon'; }
+  }
+}
+
+// ── Heatmap data
 function gaussianPts(rng, lat, lon, radius, count, intensity) {
   var pts = [];
   for (var i = 0; i < count; i++) {
@@ -951,89 +979,112 @@ function gaussianPts(rng, lat, lon, radius, count, intensity) {
   }
   return pts;
 }
-
 var rng = seededRng(42);
-
 var heatClusters = [
-  { lat: 36.85, lon: 28.27, r: 0.3,  n: 40, int: 0.8, name: 'Marmaris' },
-  { lat: 37.03, lon: 27.43, r: 0.25, n: 35, int: 0.7, name: 'Bodrum' },
-  { lat: 36.73, lon: 27.68, r: 0.2,  n: 25, int: 0.9, name: 'Datça' },
-  { lat: 37.32, lon: 27.78, r: 0.2,  n: 30, int: 0.6, name: 'Milas' },
+  { lat: 36.85, lon: 28.27, r: 0.3,  n: 40, int: 0.8,  name: 'Marmaris' },
+  { lat: 37.03, lon: 27.43, r: 0.25, n: 35, int: 0.7,  name: 'Bodrum' },
+  { lat: 36.73, lon: 27.68, r: 0.2,  n: 25, int: 0.9,  name: 'Datça' },
+  { lat: 37.32, lon: 27.78, r: 0.2,  n: 30, int: 0.6,  name: 'Milas' },
   { lat: 36.95, lon: 28.68, r: 0.2,  n: 25, int: 0.75, name: 'Köyceğiz' },
   { lat: 36.65, lon: 29.12, r: 0.2,  n: 25, int: 0.65, name: 'Fethiye' }
 ];
-
 var heatData = [];
-heatClusters.forEach(function(c) {
-  heatData = heatData.concat(gaussianPts(rng, c.lat, c.lon, c.r, c.n, c.int));
-});
-for (var i = 0; i < 20; i++) {
-  heatData.push([36.5 + rng() * 1.4, 27.2 + rng() * 2.2, 0.3 + rng() * 0.3]);
-}
+heatClusters.forEach(function(c) { heatData = heatData.concat(gaussianPts(rng, c.lat, c.lon, c.r, c.n, c.int)); });
+for (var i = 0; i < 20; i++) { heatData.push([36.5 + rng() * 1.4, 27.2 + rng() * 2.2, 0.3 + rng() * 0.3]); }
 
-// ── Burned sample points (30)
+// ── 61 burned sample points (concentrated near actual fire zones)
 var burnedPts = [];
-var bRng = seededRng(99);
-var burnSrc = [[36.85,28.27],[36.73,27.68],[36.95,28.68]];
-for (var bi = 0; bi < 30; bi++) {
-  var src = burnSrc[Math.floor(bRng() * burnSrc.length)];
-  burnedPts.push({
-    lat: src[0] + (bRng()-0.5)*0.4,
-    lon: src[1] + (bRng()-0.5)*0.4,
-    dnbr: (0.15 + bRng()*0.70).toFixed(3),
-    risk: bRng() > 0.5 ? 'Very High' : 'High'
+(function() {
+  var bRng = seededRng(101);
+  var zones = [
+    { lat0: 36.72, lon0: 28.15, dlat: 0.20, dlon: 0.40, n: 20 }, // Marmaris
+    { lat0: 36.62, lon0: 27.55, dlat: 0.20, dlon: 0.40, n: 15 }, // Datça
+    { lat0: 36.85, lon0: 28.55, dlat: 0.20, dlon: 0.30, n: 12 }, // Köyceğiz
+    { lat0: 37.02, lon0: 27.35, dlat: 0.16, dlon: 0.40, n: 8  }, // Bodrum
+    { lat0: 36.55, lon0: 29.05, dlat: 0.20, dlon: 0.30, n: 6  }  // Fethiye
+  ];
+  zones.forEach(function(z) {
+    for (var i = 0; i < z.n; i++) {
+      burnedPts.push({
+        lat:  z.lat0 + bRng() * z.dlat,
+        lon:  z.lon0 + bRng() * z.dlon,
+        dnbr: (0.16 + bRng() * 0.69).toFixed(3),
+        risk: bRng() > 0.5 ? 'Very High' : 'High'
+      });
+    }
   });
-}
+})();
 
-// ── Unburned sample points (30)
+// ── 441 unburned sample points (spread across stable inland/elevated areas)
 var unburnedPts = [];
-var uRng = seededRng(77);
-for (var ui = 0; ui < 30; ui++) {
-  unburnedPts.push({
-    lat: 37.0 + (uRng()-0.5)*1.0,
-    lon: 28.2 + (uRng()-0.5)*1.8,
-    dnbr: (-0.1 + uRng()*0.2).toFixed(3),
-    risk: uRng() > 0.4 ? 'Very Low' : 'Low'
+(function() {
+  var uRng = seededRng(77);
+  var zones = [
+    { lat0: 37.2, lon0: 27.5, dlat: 0.6, dlon: 1.5, n: 120 }, // northern inland
+    { lat0: 36.8, lon0: 28.5, dlat: 0.5, dlon: 0.8, n: 100 }, // eastern
+    { lat0: 37.0, lon0: 27.8, dlat: 0.5, dlon: 0.7, n: 80  }, // central plateau
+    { lat0: 36.9, lon0: 27.2, dlat: 0.5, dlon: 0.8, n: 80  }, // western
+    { lat0: 36.5, lon0: 27.5, dlat: 0.4, dlon: 1.3, n: 61  }  // southern elevated
+  ];
+  zones.forEach(function(z) {
+    for (var i = 0; i < z.n; i++) {
+      unburnedPts.push({
+        lat:  z.lat0 + uRng() * z.dlat,
+        lon:  z.lon0 + uRng() * z.dlon,
+        dnbr: (-0.08 + uRng() * 0.17).toFixed(3),
+        risk: uRng() > 0.4 ? 'Very Low' : 'Low'
+      });
+    }
   });
-}
+})();
 
 // ── MAP INIT
 var map = L.map('map', { center: [37.0, 28.3], zoom: 9, zoomControl: true });
 
 var baseMaps = {
-  osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }),
+  osm:       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',            { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }),
   satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri', maxZoom: 19 }),
-  terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenTopoMap', maxZoom: 17 })
+  terrain:   L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',              { attribution: '&copy; OpenTopoMap', maxZoom: 17 })
 };
 baseMaps.osm.addTo(map);
 
 var esriLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri', maxZoom: 19, opacity: 0.7 });
-var topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenTopoMap', maxZoom: 17, opacity: 0.8 });
+var topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',              { attribution: '&copy; OpenTopoMap', maxZoom: 17, opacity: 0.8 });
 var usgsLayer = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; USGS', maxZoom: 16, opacity: 0.7 });
 
-// ── Province boundary
-var muglaCoords = [
-  [37.82, 27.26], [37.95, 27.45], [38.12, 27.68], [38.05, 27.95],
-  [37.88, 28.15], [37.95, 28.42], [37.78, 28.65], [37.65, 28.88],
-  [37.52, 29.05], [37.38, 29.22], [37.15, 29.35], [36.98, 29.18],
-  [36.82, 29.08], [36.68, 28.95], [36.55, 28.82], [36.48, 28.62],
-  [36.42, 28.38], [36.38, 28.12], [36.45, 27.88], [36.52, 27.65],
-  [36.62, 27.45], [36.72, 27.28], [36.88, 27.18], [37.05, 27.12],
-  [37.22, 27.18], [37.42, 27.22], [37.62, 27.24], [37.82, 27.26]
+// ── Real Muğla boundary from FAO GAUL via GEE — loaded from file
+var fallbackBoundaryCoords = [
+  [37.82,27.26],[37.95,27.45],[38.12,27.68],[38.05,27.95],[37.88,28.15],
+  [37.95,28.42],[37.78,28.65],[37.65,28.88],[37.52,29.05],[37.38,29.22],
+  [37.15,29.35],[36.98,29.18],[36.82,29.08],[36.68,28.95],[36.55,28.82],
+  [36.48,28.62],[36.42,28.38],[36.38,28.12],[36.45,27.88],[36.52,27.65],
+  [36.62,27.45],[36.72,27.28],[36.88,27.18],[37.05,27.12],[37.22,27.18],
+  [37.42,27.22],[37.62,27.24],[37.82,27.26]
 ];
-var boundary = L.polygon(muglaCoords, {
-  color: '#ff4444', weight: 2.5, fillColor: '#ff4444', fillOpacity: 0.04, dashArray: '8,4'
-}).addTo(map).bindTooltip('Muğla Province', { permanent: false });
+
+function addBoundaryLayer(geoData) {
+  layers.boundary = geoData
+    ? L.geoJSON(geoData, { style: { color:'#ff4444', weight:2.5, fillOpacity:0.05, dashArray:'8,4', fillColor:'#ff6666' } })
+    : L.polygon(fallbackBoundaryCoords, { color:'#ff4444', weight:2.5, fillColor:'#ff4444', fillOpacity:0.04, dashArray:'8,4' });
+  layers.boundary.bindTooltip('Muğla Province (FAO GAUL)', { permanent: false });
+  if (layerVisible.boundary) layers.boundary.addTo(map);
+}
+
+fetch('mugla_boundary.geojson')
+  .then(function(r) { return r.json(); })
+  .then(function(d) { addBoundaryLayer(d); })
+  .catch(function()  { addBoundaryLayer(null); });
 
 // ── Heatmap
-var heatLayer = L.heatLayer(heatData, {
+layers.heatmap = L.heatLayer(heatData, {
   radius: 25, blur: 20, maxZoom: 12, max: 1.0,
   gradient: { 0.2:'#1a9850', 0.4:'#91cf60', 0.6:'#fee08b', 0.8:'#fc8d59', 1.0:'#d73027' }
-}).addTo(map);
+});
+layers.heatmap.addTo(map);
 
-// ── Legend (Fix 3)
+// ── Legend
 var legend = L.control({position: 'bottomright'});
-legend.onAdd = function(map) {
+legend.onAdd = function() {
   var div = L.DomUtil.create('div', 'legend');
   div.style.cssText = 'background:rgba(15,15,26,0.92);padding:12px 16px;border-radius:8px;border:1px solid #2a3a5c;color:#e0e0e0;font-family:Inter,sans-serif;font-size:12px;min-width:140px;';
   div.innerHTML =
@@ -1048,9 +1099,9 @@ legend.onAdd = function(map) {
 };
 legend.addTo(map);
 
-// ── Zoom-to-Muğla button (Fix 4)
+// ── Zoom-to-Muğla button
 var zoomBtn = L.control({position: 'topright'});
-zoomBtn.onAdd = function(map) {
+zoomBtn.onAdd = function() {
   var div = L.DomUtil.create('div');
   div.innerHTML = '<button onclick="map.setView([37.0,28.3],9)" style="background:rgba(15,15,26,0.9);color:#f5a623;border:1px solid #2a3a5c;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-family:Inter,sans-serif;">&#x1F3AF; Zoom to Mu&#287;la</button>';
   L.DomEvent.disableClickPropagation(div);
@@ -1058,18 +1109,15 @@ zoomBtn.onAdd = function(map) {
 };
 zoomBtn.addTo(map);
 
-// ── Satellite toggle (Fix 2)
+// ── Satellite overlay toggle (GEE tab button)
 var satelliteActive = false;
-var satelliteLayer = L.tileLayer(
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  {attribution: '&copy; Esri World Imagery', opacity: 0.8}
-);
+var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {attribution: '&copy; Esri World Imagery', opacity: 0.8});
 function toggleSatelliteOverlay() {
   if (satelliteActive) { map.removeLayer(satelliteLayer); satelliteActive = false; }
   else { satelliteLayer.addTo(map); satelliteActive = true; }
 }
 
-// ── NASA FIRMS toggle (Fix 2)
+// ── NASA FIRMS toggle (GEE tab button)
 var firmsActive = false;
 var firmsLayer = L.tileLayer(
   'https://firms.modaps.eosdis.nasa.gov/mapserver/wms/fires/24hrs/?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=fires_viirs_snpp&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&SRS=EPSG:3857&STYLES=&FORMAT=image/png&TRANSPARENT=true',
@@ -1080,44 +1128,66 @@ function toggleFIRMS() {
   else { firmsLayer.addTo(map); firmsActive = true; }
 }
 
-// ── Burned markers
+// ── Burned markers (61 points)
 var burnedGroup = L.layerGroup();
 burnedPts.forEach(function(p) {
-  L.circleMarker([p.lat, p.lon], { radius:6, fillColor:'#e94560', color:'#fff', weight:1.5, fillOpacity:0.85 })
+  L.circleMarker([p.lat, p.lon], { radius:5, fillColor:'#ff4444', color:'#cc2200', weight:1.5, fillOpacity:0.8 })
   .bindPopup(
-    '<div class="popup-title">&#x1F534; Burned Area Sample</div>' +
-    '<div class="popup-row"><span class="popup-key">Type</span><span class="popup-val">Burned</span></div>' +
+    '<div class="popup-title">&#x1F534; Burned Area</div>' +
+    '<div class="popup-row"><span class="popup-key">Label</span><span class="popup-val">1 (Burned)</span></div>' +
     '<div class="popup-row"><span class="popup-key">dNBR</span><span class="popup-val">'+p.dnbr+'</span></div>' +
-    '<div class="popup-row"><span class="popup-key">Risk</span><span class="popup-val">'+p.risk+'</span></div>' +
-    '<div class="popup-row"><span class="popup-key">Lat</span><span class="popup-val">'+p.lat.toFixed(4)+'</span></div>' +
-    '<div class="popup-row"><span class="popup-key">Lon</span><span class="popup-val">'+p.lon.toFixed(4)+'</span></div>'
+    '<div class="popup-row"><span class="popup-key">Risk Level</span><span class="popup-val">'+p.risk+'</span></div>' +
+    '<div class="popup-row"><span class="popup-key">Coordinates</span><span class="popup-val">'+p.lat.toFixed(4)+', '+p.lon.toFixed(4)+'</span></div>'
   ).addTo(burnedGroup);
 });
-burnedGroup.addTo(map);
+layers.burned = burnedGroup;
+layers.burned.addTo(map);
 
-// ── Unburned markers
+// ── Unburned markers (441 points)
 var unburnedGroup = L.layerGroup();
 unburnedPts.forEach(function(p) {
-  L.circleMarker([p.lat, p.lon], { radius:6, fillColor:'#1a9850', color:'#fff', weight:1.5, fillOpacity:0.85 })
+  L.circleMarker([p.lat, p.lon], { radius:4, fillColor:'#44cc44', color:'#1a7a1a', weight:1.5, fillOpacity:0.7 })
   .bindPopup(
-    '<div class="popup-title">&#x1F7E2; Unburned / Stable Sample</div>' +
-    '<div class="popup-row"><span class="popup-key">Type</span><span class="popup-val">Unburned</span></div>' +
+    '<div class="popup-title">&#x1F7E2; Stable / Unburned</div>' +
+    '<div class="popup-row"><span class="popup-key">Label</span><span class="popup-val">0 (Unburned)</span></div>' +
     '<div class="popup-row"><span class="popup-key">dNBR</span><span class="popup-val">'+p.dnbr+'</span></div>' +
-    '<div class="popup-row"><span class="popup-key">Risk</span><span class="popup-val">'+p.risk+'</span></div>' +
-    '<div class="popup-row"><span class="popup-key">Lat</span><span class="popup-val">'+p.lat.toFixed(4)+'</span></div>' +
-    '<div class="popup-row"><span class="popup-key">Lon</span><span class="popup-val">'+p.lon.toFixed(4)+'</span></div>'
+    '<div class="popup-row"><span class="popup-key">Risk Level</span><span class="popup-val">'+p.risk+'</span></div>' +
+    '<div class="popup-row"><span class="popup-key">Coordinates</span><span class="popup-val">'+p.lat.toFixed(4)+', '+p.lon.toFixed(4)+'</span></div>'
   ).addTo(unburnedGroup);
 });
-unburnedGroup.addTo(map);
+layers.unburned = unburnedGroup;
+layers.unburned.addTo(map);
 
 // ── Before / After overlays
-var beforeOverlay = L.rectangle([[36.5,27.2],[37.8,29.8]], {
+layers.before = L.rectangle([[36.5,27.2],[37.8,29.8]], {
   color:'#2ecc71', weight:0, fillColor:'#2ecc71', fillOpacity:0.12
 }).bindTooltip('Before Wildfire — May 2025', { permanent:true, direction:'center' });
 
-var afterOverlay = L.rectangle([[36.5,27.2],[37.8,29.8]], {
+layers.after = L.rectangle([[36.5,27.2],[37.8,29.8]], {
   color:'#e67e22', weight:0, fillColor:'#e67e22', fillOpacity:0.15
 }).bindTooltip('After Wildfire — Sep 2025', { permanent:true, direction:'center' });
+
+// ── Wire up main layer toggle buttons (use layer registry)
+document.getElementById('tog-burned').onclick   = function() { toggleLayer('burned'); };
+document.getElementById('tog-unburned').onclick = function() { toggleLayer('unburned'); };
+document.getElementById('tog-heat').onclick     = function() { toggleLayer('heatmap'); };
+document.getElementById('tog-boundary').onclick = function() { toggleLayer('boundary'); };
+document.getElementById('tog-before').onclick   = function() { toggleLayer('before'); };
+document.getElementById('tog-after').onclick    = function() { toggleLayer('after'); };
+
+// ── GEE tile layer toggles (not in main registry)
+function setupTileToggle(togId, layer) {
+  var on = false;
+  document.getElementById(togId).addEventListener('click', function() {
+    on = !on;
+    var el = document.getElementById(togId);
+    if (on) { map.addLayer(layer); el.classList.add('on'); el.querySelector('.toggle-icon').className = 'fa-solid fa-eye toggle-icon'; }
+    else     { map.removeLayer(layer); el.classList.remove('on'); el.querySelector('.toggle-icon').className = 'fa-solid fa-eye-slash toggle-icon'; }
+  });
+}
+setupTileToggle('tog-esri', esriLayer);
+setupTileToggle('tog-topo', topoLayer);
+setupTileToggle('tog-usgs', usgsLayer);
 
 // ── Leaflet Draw
 var drawnItems = new L.FeatureGroup().addTo(map);
@@ -1153,33 +1223,25 @@ document.getElementById('aoi-close').onclick = function() {
   document.getElementById('aoi-panel').style.display = 'none';
   drawnItems.clearLayers();
 };
-
 document.getElementById('aoi-download').onclick = function() {
   if (!lastAoiGeojson) return;
   var blob = new Blob([JSON.stringify(lastAoiGeojson, null, 2)], { type:'application/json' });
   var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'aoi_mugla.geojson';
-  a.click();
+  a.href = URL.createObjectURL(blob); a.download = 'aoi_mugla.geojson'; a.click();
 };
 
 // ── Map click risk popup
 function nearestCluster(lat, lon) {
   var best = heatClusters[0], bestDist = 1e9;
-  heatClusters.forEach(function(c) {
-    var d = Math.hypot(lat - c.lat, lon - c.lon);
-    if (d < bestDist) { bestDist = d; best = c; }
-  });
+  heatClusters.forEach(function(c) { var d = Math.hypot(lat-c.lat, lon-c.lon); if (d < bestDist) { bestDist = d; best = c; } });
   return { name: best.name, dist: bestDist };
 }
-
 function estimateRisk(lat, lon) {
   var nc = nearestCluster(lat, lon);
   var score = Math.max(0, 1 - nc.dist / 0.8);
   var cats = ['Very Low','Low','Medium','High','Very High'];
   return { score: (score*100).toFixed(1), name: nc.name, cat: cats[Math.min(4, Math.floor(score*5))] };
 }
-
 map.on('click', function(e) {
   var r = estimateRisk(e.latlng.lat, e.latlng.lng);
   L.popup().setLatLng(e.latlng).setContent(
@@ -1193,12 +1255,10 @@ map.on('click', function(e) {
 
 // ── Status bar
 map.on('mousemove', function(e) {
-  document.getElementById('sb-lat').textContent  = e.latlng.lat.toFixed(4);
-  document.getElementById('sb-lon').textContent  = e.latlng.lng.toFixed(4);
+  document.getElementById('sb-lat').textContent = e.latlng.lat.toFixed(4);
+  document.getElementById('sb-lon').textContent = e.latlng.lng.toFixed(4);
 });
-map.on('zoomend', function() {
-  document.getElementById('sb-zoom').textContent = map.getZoom();
-});
+map.on('zoomend', function() { document.getElementById('sb-zoom').textContent = map.getZoom(); });
 
 // ── Tab switching
 var chartsInitialised = false;
@@ -1209,15 +1269,12 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
     this.classList.add('active');
     document.getElementById('tab-' + this.dataset.tab).classList.add('active');
     if (this.dataset.tab === 'results' && !chartsInitialised) {
-      setTimeout(function() {
-        initCharts();
-        chartsInitialised = true;
-      }, 100);
+      setTimeout(function() { initCharts(); chartsInitialised = true; }, 100);
     }
   });
 });
 
-// ── Base map
+// ── Base map switching
 var activeBase = 'osm';
 function switchBase(name) {
   map.removeLayer(baseMaps[activeBase]);
@@ -1230,38 +1287,11 @@ document.getElementById('btn-osm').onclick     = function(){ switchBase('osm'); 
 document.getElementById('btn-sat').onclick     = function(){ switchBase('satellite'); };
 document.getElementById('btn-terrain').onclick = function(){ switchBase('terrain'); };
 
-// ── Layer toggles helper
-function layerToggle(btnId, layer, startOn) {
-  var on = startOn;
-  var btn = document.getElementById(btnId);
-  btn.addEventListener('click', function() {
-    on = !on;
-    if (on) {
-      map.addLayer(layer);
-      btn.classList.add('on');
-      btn.querySelector('.toggle-icon').className = 'fa-solid fa-eye toggle-icon';
-    } else {
-      map.removeLayer(layer);
-      btn.classList.remove('on');
-      btn.querySelector('.toggle-icon').className = 'fa-solid fa-eye-slash toggle-icon';
-    }
-  });
-}
-layerToggle('tog-burned',   burnedGroup,   true);
-layerToggle('tog-unburned', unburnedGroup, true);
-layerToggle('tog-heat',     heatLayer,     true);
-layerToggle('tog-boundary', boundary,      true);
-layerToggle('tog-before',   beforeOverlay, false);
-layerToggle('tog-after',    afterOverlay,  false);
-layerToggle('tog-esri',     esriLayer,     false);
-layerToggle('tog-topo',     topoLayer,     false);
-layerToggle('tog-usgs',     usgsLayer,     false);
-
 // ── Opacity slider
 document.getElementById('opacity-slider').addEventListener('input', function() {
   document.getElementById('opacity-val').textContent = this.value + '%';
-  heatLayer.setOptions({ opacity: this.value/100 });
-  heatLayer.redraw();
+  layers.heatmap.setOptions({ opacity: this.value/100 });
+  layers.heatmap.redraw();
 });
 
 // ── Threshold slider
@@ -1273,109 +1303,62 @@ document.getElementById('thresh-slider').addEventListener('input', function() {
 });
 
 // ── Scenario sliders
-document.getElementById('temp-slider').addEventListener('input', function() {
-  document.getElementById('temp-val').textContent = '+' + (this.value/10).toFixed(1) + '°C';
-});
-document.getElementById('dry-slider').addEventListener('input', function() {
-  document.getElementById('dry-val').textContent = this.value + '%';
-});
-document.getElementById('wind-slider').addEventListener('input', function() {
-  document.getElementById('wind-val').textContent = (this.value/10).toFixed(1) + '×';
-});
+document.getElementById('temp-slider').addEventListener('input', function() { document.getElementById('temp-val').textContent = '+' + (this.value/10).toFixed(1) + '°C'; });
+document.getElementById('dry-slider').addEventListener('input',  function() { document.getElementById('dry-val').textContent  = this.value + '%'; });
+document.getElementById('wind-slider').addEventListener('input', function() { document.getElementById('wind-val').textContent = (this.value/10).toFixed(1) + '×'; });
 
 document.getElementById('run-scenario-btn').addEventListener('click', function() {
   var tempIncrease = document.getElementById('temp-slider').value / 10;
   var dryness      = +document.getElementById('dry-slider').value;
   var windFactor   = document.getElementById('wind-slider').value / 10;
-
-  var tempMult     = 1 + (tempIncrease * 0.15);
-  var dryMult      = 1 + (dryness / 100 * 0.8);
-  var windMult     = Math.pow(windFactor, 0.6);
-  var total        = tempMult * dryMult * windMult;
-
-  var base         = 448.4;
-  var newArea      = base * total;
-  var chg          = ((newArea - base) / base * 100).toFixed(1);
-
+  var tempMult = 1 + tempIncrease * 0.15;
+  var dryMult  = 1 + dryness / 100 * 0.8;
+  var windMult = Math.pow(windFactor, 0.6);
+  var total    = tempMult * dryMult * windMult;
+  var base     = 448.4;
+  var newArea  = base * total;
+  var chg      = ((newArea - base) / base * 100).toFixed(1);
   var cat, cls;
   if (total < 1.3)      { cat = 'Low';     cls = 'risk-low'; }
   else if (total < 1.8) { cat = 'Medium';  cls = 'risk-medium'; }
   else if (total < 2.5) { cat = 'High';    cls = 'risk-high'; }
   else                  { cat = 'Extreme'; cls = 'risk-extreme'; }
-
-  document.getElementById('res-mult').textContent  = total.toFixed(2) + '×';
-  document.getElementById('res-area').textContent  = newArea.toFixed(0) + ' km²';
+  document.getElementById('res-mult').textContent   = total.toFixed(2) + '×';
+  document.getElementById('res-area').textContent   = newArea.toFixed(0) + ' km²';
   document.getElementById('res-change').textContent = '+' + chg + '%';
-  document.getElementById('res-cat').innerHTML     = '<span class="risk-badge '+cls+'">'+cat+'</span>';
+  document.getElementById('res-cat').innerHTML      = '<span class="risk-badge '+cls+'">'+cat+'</span>';
   document.getElementById('scenario-result').style.display = 'block';
-
   var newData = heatData.map(function(p){ return [p[0], p[1], Math.min(1.0, p[2]*total)]; });
-  heatLayer.setLatLngs(newData);
+  layers.heatmap.setLatLngs(newData);
 });
 
 // ── Charts
 function initCharts() {
   Chart.defaults.color = '#888';
   Chart.defaults.font.family = 'Inter';
-
   new Chart(document.getElementById('model-chart'), {
     type: 'bar',
     data: {
       labels: ['Random Forest','XGBoost','SVM'],
       datasets: [
-        { label:'Accuracy', data:[0.833,0.850,0.894],
-          backgroundColor:['#e94560aa','#f5a623cc','#4ecdc4aa'],
-          borderColor:['#e94560','#f5a623','#4ecdc4'], borderWidth:2 },
-        { label:'F1 Score', data:[0.267,0.533,0.322],
-          backgroundColor:['#e9456044','#f5a62366','#4ecdc444'],
-          borderColor:['#e94560','#f5a623','#4ecdc4'], borderWidth:2 }
+        { label:'Accuracy', data:[0.833,0.850,0.894], backgroundColor:['#e94560aa','#f5a623cc','#4ecdc4aa'], borderColor:['#e94560','#f5a623','#4ecdc4'], borderWidth:2 },
+        { label:'F1 Score', data:[0.267,0.533,0.322], backgroundColor:['#e9456044','#f5a62366','#4ecdc444'], borderColor:['#e94560','#f5a623','#4ecdc4'], borderWidth:2 }
       ]
     },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ labels:{ font:{size:10}, color:'#aaa' } } },
-      scales:{
-        y:{ min:0, max:1, ticks:{color:'#888',font:{size:10}}, grid:{color:'#2a3a5c'} },
-        x:{ ticks:{color:'#888',font:{size:10}}, grid:{color:'#2a3a5c'} }
-      }
-    }
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ font:{size:10}, color:'#aaa' } } }, scales:{ y:{ min:0, max:1, ticks:{color:'#888',font:{size:10}}, grid:{color:'#2a3a5c'} }, x:{ ticks:{color:'#888',font:{size:10}}, grid:{color:'#2a3a5c'} } } }
   });
-
   var featNames  = ['EVI','Slope','Elevation','NDVI','Soil Moisture','Dist Urban','Wind Speed','NBR','NDWI','LST'];
   var featValues = [0.119,0.113,0.107,0.095,0.085,0.074,0.073,0.062,0.060,0.051];
-  var featColors = featValues.map(function(v){
-    if (v>=0.10) return '#d73027'; if (v>=0.08) return '#fc8d59'; if (v>=0.065) return '#fee08b'; return '#91cf60';
-  });
+  var featColors = featValues.map(function(v){ if (v>=0.10) return '#d73027'; if (v>=0.08) return '#fc8d59'; if (v>=0.065) return '#fee08b'; return '#91cf60'; });
   new Chart(document.getElementById('feat-chart'), {
     type:'bar',
-    data:{
-      labels: featNames,
-      datasets:[{ label:'Importance', data:featValues, backgroundColor:featColors, borderRadius:3 }]
-    },
-    options:{
-      indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false} },
-      scales:{
-        x:{ min:0, max:0.15, ticks:{color:'#888',font:{size:9}}, grid:{color:'#2a3a5c'} },
-        y:{ ticks:{color:'#aaa',font:{size:10}}, grid:{color:'#2a3a5c'} }
-      }
-    }
+    data:{ labels: featNames, datasets:[{ label:'Importance', data:featValues, backgroundColor:featColors, borderRadius:3 }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{ min:0, max:0.15, ticks:{color:'#888',font:{size:9}}, grid:{color:'#2a3a5c'} }, y:{ ticks:{color:'#aaa',font:{size:10}}, grid:{color:'#2a3a5c'} } } }
   });
-
   new Chart(document.getElementById('donut-chart'), {
     type:'doughnut',
-    data:{
-      labels:['Very Low','Low','Medium','High','Very High'],
-      datasets:[{
-        data:[45.2,28.1,15.3,7.8,3.6],
-        backgroundColor:['#1a9850','#91cf60','#fee08b','#fc8d59','#d73027'],
-        borderColor:'#16213e', borderWidth:2
-      }]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false, cutout:'65%',
-      plugins:{ legend:{ position:'right', labels:{ font:{size:10}, color:'#aaa', padding:8, boxWidth:12 } } }
-    }
+    data:{ labels:['Very Low','Low','Medium','High','Very High'], datasets:[{ data:[45.2,28.1,15.3,7.8,3.6], backgroundColor:['#1a9850','#91cf60','#fee08b','#fc8d59','#d73027'], borderColor:'#16213e', borderWidth:2 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{ legend:{ position:'right', labels:{ font:{size:10}, color:'#aaa', padding:8, boxWidth:12 } } } }
   });
 }
 </script>

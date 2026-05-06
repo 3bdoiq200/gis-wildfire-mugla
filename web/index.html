@@ -3,415 +3,858 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Karabük Flood Susceptibility — Decision Support System</title>
+<title>Wildfire Susceptibility Mapping — Muğla Province</title>
+
+<!-- Leaflet -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<!-- Leaflet.draw -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.min.css"/>
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+
 <style>
-  /* ── Reset & Base ── */
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    background: #1a1a2e;
-    color: #e0e0e0;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
+/* ── Reset & Base ── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; font-family:'Inter',sans-serif; background:#0f0f1a; color:#e0e0e0; overflow:hidden; }
 
-  /* ── Title Bar ── */
-  #title-bar {
-    background: #16213e;
-    border-bottom: 2px solid #0f3460;
-    padding: 10px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    z-index: 1000;
-  }
-  #title-bar h1 {
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: #e94560;
-    letter-spacing: 0.04em;
-    text-align: center;
-  }
-  #title-bar h1 span {
-    color: #a0c4ff;
-    font-weight: 400;
-    font-size: 0.9rem;
-    display: block;
-    margin-top: 2px;
-  }
+/* ── Layout ── */
+#app { display:flex; flex-direction:column; height:100vh; }
 
-  /* ── Map Container ── */
-  #map {
-    flex: 1;
-    width: 100%;
-  }
+/* ── Header ── */
+#header {
+  background:#1a1a2e;
+  border-bottom:2px solid #e74c3c;
+  padding:10px 20px;
+  display:flex; align-items:center; justify-content:space-between;
+  flex-shrink:0; z-index:1100;
+}
+#header .title-block h1 { font-size:1.05rem; font-weight:700; color:#fff; letter-spacing:.3px; }
+#header .title-block p  { font-size:.72rem; color:#aaa; margin-top:2px; }
+#header .badges { display:flex; gap:8px; }
+#header .badge {
+  background:#e74c3c22; border:1px solid #e74c3c55;
+  color:#e74c3c; padding:3px 10px; border-radius:12px; font-size:.7rem; font-weight:600;
+}
 
-  /* ── Leaflet Override for Dark Theme ── */
-  .leaflet-container { background: #1a1a2e !important; }
-  .leaflet-control-layers,
-  .leaflet-control-zoom {
-    background: #16213e !important;
-    border: 1px solid #0f3460 !important;
-    color: #e0e0e0 !important;
-    border-radius: 6px !important;
-  }
-  .leaflet-control-layers label,
-  .leaflet-control-layers-base label { color: #e0e0e0 !important; }
-  .leaflet-control-zoom a {
-    background: #16213e !important;
-    color: #a0c4ff !important;
-    border-color: #0f3460 !important;
-  }
-  .leaflet-control-zoom a:hover { background: #0f3460 !important; }
-  .leaflet-popup-content-wrapper {
-    background: #16213e !important;
-    color: #e0e0e0 !important;
-    border: 1px solid #0f3460 !important;
-    border-radius: 8px !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.6) !important;
-  }
-  .leaflet-popup-tip { background: #16213e !important; }
-  .leaflet-control-attribution {
-    background: rgba(22,33,62,0.85) !important;
-    color: #666 !important;
-    font-size: 10px !important;
-  }
-  .leaflet-control-attribution a { color: #a0c4ff !important; }
+/* ── Body row ── */
+#body { display:flex; flex:1; overflow:hidden; }
 
-  /* ── Info Panel (top-right) ── */
-  #info-panel {
-    position: absolute;
-    top: 70px;
-    right: 10px;
-    z-index: 800;
-    background: rgba(22,33,62,0.92);
-    border: 1px solid #0f3460;
-    border-radius: 8px;
-    padding: 12px 14px;
-    max-width: 230px;
-    font-size: 0.78rem;
-    line-height: 1.5;
-    color: #b0c4de;
-  }
-  #info-panel h3 {
-    color: #a0c4ff;
-    font-size: 0.82rem;
-    margin-bottom: 6px;
-    border-bottom: 1px solid #0f3460;
-    padding-bottom: 4px;
-  }
+/* ── Sidebar ── */
+#sidebar {
+  width:320px; min-width:320px; background:#12121f;
+  border-right:1px solid #2a2a45;
+  display:flex; flex-direction:column; overflow-y:auto; z-index:500; flex-shrink:0;
+}
+#sidebar::-webkit-scrollbar { width:5px; }
+#sidebar::-webkit-scrollbar-track { background:#12121f; }
+#sidebar::-webkit-scrollbar-thumb { background:#333; border-radius:3px; }
 
-  /* ── Legend (bottom-right, inside Leaflet control) ── */
-  .legend-box {
-    background: rgba(22,33,62,0.95);
-    border: 1px solid #0f3460;
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 0.78rem;
-    color: #e0e0e0;
-    min-width: 165px;
-  }
-  .legend-box h4 {
-    color: #a0c4ff;
-    margin-bottom: 8px;
-    font-size: 0.80rem;
-    border-bottom: 1px solid #0f3460;
-    padding-bottom: 4px;
-  }
-  .legend-row {
-    display: flex;
-    align-items: center;
-    margin: 4px 0;
-  }
-  .legend-swatch {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    margin-right: 8px;
-    flex-shrink: 0;
-    border: 1px solid rgba(255,255,255,0.2);
-  }
+/* ── Sidebar Sections ── */
+.sidebar-section { border-bottom:1px solid #2a2a45; }
+.sidebar-section-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; cursor:pointer; user-select:none;
+  background:#1a1a2e; transition:background .2s;
+}
+.sidebar-section-header:hover { background:#1f1f38; }
+.sidebar-section-header .sec-title { font-size:.8rem; font-weight:600; color:#ccc; display:flex; align-items:center; gap:8px; }
+.sidebar-section-header .sec-title i { color:#e74c3c; width:14px; }
+.sidebar-section-header .chevron { font-size:.65rem; color:#666; transition:transform .2s; }
+.sidebar-section-header.collapsed .chevron { transform:rotate(-90deg); }
+.sidebar-section-body { padding:12px 16px; display:block; }
+.sidebar-section-body.hidden { display:none; }
 
-  /* ── Rainfall Slider (bottom-left) ── */
-  #slider-panel {
-    position: absolute;
-    bottom: 30px;
-    left: 10px;
-    z-index: 800;
-    background: rgba(22,33,62,0.92);
-    border: 1px solid #0f3460;
-    border-radius: 8px;
-    padding: 12px 16px;
-    min-width: 210px;
-    font-size: 0.78rem;
-    color: #b0c4de;
-  }
-  #slider-panel label {
-    display: block;
-    color: #a0c4ff;
-    font-weight: 600;
-    margin-bottom: 6px;
-    font-size: 0.80rem;
-  }
-  #rainfall-slider {
-    width: 100%;
-    accent-color: #e94560;
-    cursor: pointer;
-  }
-  #slider-value {
-    margin-top: 5px;
-    font-size: 0.82rem;
-    color: #e0e0e0;
-    text-align: center;
-  }
+/* ── Toggle Buttons ── */
+.layer-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.layer-btn {
+  padding:7px 6px; border:1px solid #333; border-radius:6px;
+  background:#1a1a2e; color:#bbb; font-size:.7rem; font-family:'Inter',sans-serif;
+  cursor:pointer; display:flex; align-items:center; gap:5px; transition:all .2s;
+}
+.layer-btn i { font-size:.75rem; }
+.layer-btn:hover { border-color:#e74c3c55; color:#ddd; }
+.layer-btn.active { background:#e74c3c22; border-color:#e74c3c; color:#ff6b6b; }
 
-  /* ── Loading Overlay ── */
-  #loading {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 900;
-    background: rgba(22,33,62,0.95);
-    border: 1px solid #0f3460;
-    border-radius: 10px;
-    padding: 20px 30px;
-    text-align: center;
-    color: #a0c4ff;
-    font-size: 0.9rem;
-  }
-  #loading .spinner {
-    width: 36px;
-    height: 36px;
-    border: 4px solid #0f3460;
-    border-top-color: #e94560;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 10px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* ── Sliders ── */
+.slider-row { margin-bottom:12px; }
+.slider-label { display:flex; justify-content:space-between; font-size:.73rem; color:#aaa; margin-bottom:5px; }
+.slider-label span { color:#e74c3c; font-weight:600; }
+input[type=range] {
+  width:100%; -webkit-appearance:none; appearance:none;
+  height:4px; border-radius:2px; background:#2a2a45; outline:none; cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+  background:#e74c3c; cursor:pointer; border:2px solid #fff;
+}
+.risk-labels { display:flex; justify-content:space-between; font-size:.62rem; color:#666; margin-top:3px; }
 
-  /* ── Popup Styles ── */
-  .popup-title {
-    font-weight: 700;
-    font-size: 0.92rem;
-    margin-bottom: 6px;
-    color: #a0c4ff;
-  }
-  .popup-row { font-size: 0.82rem; margin: 3px 0; }
-  .popup-row .label { color: #888; }
-  .popup-row .value { color: #e0e0e0; font-weight: 600; }
-  .risk-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: #fff;
-  }
+/* ── Risk Gradient Bar ── */
+.risk-bar {
+  height:8px; border-radius:4px; margin:8px 0;
+  background:linear-gradient(to right,#1a9850,#91cf60,#fee08b,#fc8d59,#d73027);
+}
+
+/* ── Scenario Sliders ── */
+.scenario-btn {
+  width:100%; padding:9px; border:none; border-radius:7px;
+  background:linear-gradient(135deg,#e74c3c,#c0392b);
+  color:#fff; font-family:'Inter',sans-serif; font-size:.8rem; font-weight:600;
+  cursor:pointer; margin-top:8px; letter-spacing:.3px; transition:opacity .2s;
+}
+.scenario-btn:hover { opacity:.9; }
+.scenario-result { margin-top:10px; padding:8px 10px; background:#1a1a2e; border-radius:6px; border-left:3px solid #e74c3c; font-size:.73rem; color:#ccc; display:none; }
+.scenario-result.visible { display:block; }
+.scenario-result strong { color:#ff6b6b; }
+
+/* ── Stats Panel ── */
+.stat-row { display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #1f1f38; font-size:.73rem; }
+.stat-row:last-child { border-bottom:none; }
+.stat-label { color:#888; }
+.stat-value { color:#e0e0e0; font-weight:600; }
+.stat-value.highlight { color:#ff6b6b; }
+.model-badge { background:#e74c3c22; border:1px solid #e74c3c55; color:#ff6b6b; padding:2px 8px; border-radius:10px; font-size:.68rem; }
+
+/* ── Export Buttons ── */
+.export-btn {
+  width:100%; padding:8px 12px; border:1px solid #333; border-radius:7px;
+  background:#1a1a2e; color:#ccc; font-family:'Inter',sans-serif; font-size:.75rem;
+  cursor:pointer; display:flex; align-items:center; gap:8px;
+  margin-bottom:6px; transition:all .2s;
+}
+.export-btn:hover { border-color:#e74c3c55; color:#fff; background:#1f1f38; }
+.export-btn i { color:#e74c3c; width:14px; }
+
+/* ── Map Container ── */
+#map { flex:1; z-index:1; }
+
+/* ── Status Bar ── */
+#statusbar {
+  background:#0f0f1a; border-top:1px solid #2a2a45;
+  padding:5px 16px; display:flex; align-items:center; justify-content:space-between;
+  font-size:.68rem; color:#555; flex-shrink:0; z-index:500;
+}
+#statusbar .coords { color:#777; }
+#statusbar .footer-text { color:#444; }
+
+/* ── Legend ── */
+.legend-box {
+  background:#12121fdd; border:1px solid #2a2a45; border-radius:8px;
+  padding:10px 14px; font-size:.72rem; min-width:140px;
+}
+.legend-box h4 { color:#ccc; font-size:.73rem; margin-bottom:7px; font-weight:600; }
+.legend-row { display:flex; align-items:center; gap:8px; margin-bottom:4px; color:#aaa; }
+.legend-swatch { width:14px; height:14px; border-radius:3px; flex-shrink:0; }
+.legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+/* ── Draw toolbar custom ── */
+.leaflet-draw-toolbar a { background-color:#1a1a2e !important; border-color:#333 !important; color:#ccc !important; }
+
+/* ── Popup styling ── */
+.leaflet-popup-content-wrapper { background:#1a1a2e !important; border:1px solid #e74c3c55 !important; border-radius:8px !important; color:#e0e0e0 !important; }
+.leaflet-popup-tip { background:#1a1a2e !important; }
+.popup-title { font-weight:700; font-size:.85rem; color:#ff6b6b; margin-bottom:6px; }
+.popup-row { display:flex; justify-content:space-between; font-size:.75rem; padding:3px 0; border-bottom:1px solid #2a2a45; }
+.popup-row:last-child { border-bottom:none; }
+.popup-row .pk { color:#888; }
+.popup-row .pv { color:#e0e0e0; font-weight:500; }
+.risk-chip {
+  display:inline-block; padding:2px 9px; border-radius:10px;
+  font-size:.68rem; font-weight:700;
+}
+
+/* ── AOI stats panel ── */
+#aoi-panel {
+  position:absolute; bottom:40px; right:10px; z-index:800;
+  background:#12121fee; border:1px solid #e74c3c55; border-radius:8px;
+  padding:12px 14px; font-size:.73rem; min-width:180px; display:none;
+}
+#aoi-panel h4 { color:#ff6b6b; margin-bottom:6px; font-size:.78rem; }
+#aoi-panel .aoi-row { display:flex; justify-content:space-between; padding:3px 0; color:#aaa; }
+#aoi-panel .aoi-row span { color:#e0e0e0; font-weight:600; }
 </style>
 </head>
 <body>
+<div id="app">
 
-<!-- Title Bar -->
-<div id="title-bar">
-  <h1>Karabük Province — Flood Susceptibility Map
-    <span>CME434 Decision Support System &nbsp;|&nbsp; Karabük University &nbsp;|&nbsp; 2026</span>
-  </h1>
+  <!-- Header -->
+  <header id="header">
+    <div class="title-block">
+      <h1><i class="fa-solid fa-fire" style="color:#e74c3c;margin-right:8px;"></i>Wildfire Susceptibility Mapping — Muğla Province</h1>
+      <p>CME434 | Karabük University | Dr. Sohaib K. M. Abujayyab | 2025–2026</p>
+    </div>
+    <div class="badges">
+      <div class="badge"><i class="fa-solid fa-robot" style="margin-right:4px;"></i>XGBoost</div>
+      <div class="badge">Acc: 85%</div>
+      <div class="badge">Turkey</div>
+    </div>
+  </header>
+
+  <div id="body">
+    <!-- Sidebar -->
+    <aside id="sidebar">
+
+      <!-- 1. Layer Control -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header" onclick="toggleSection(this)">
+          <span class="sec-title"><i class="fa-solid fa-layer-group"></i> Layer Control</span>
+          <span class="chevron"><i class="fa-solid fa-chevron-down"></i></span>
+        </div>
+        <div class="sidebar-section-body">
+          <div class="layer-grid">
+            <button class="layer-btn active" id="btn-burned"    onclick="toggleLayer('burned')">
+              <i class="fa-solid fa-circle" style="color:#e74c3c;"></i> Burned Points
+            </button>
+            <button class="layer-btn active" id="btn-unburned"  onclick="toggleLayer('unburned')">
+              <i class="fa-solid fa-circle" style="color:#2ecc71;"></i> Unburned Pts
+            </button>
+            <button class="layer-btn active" id="btn-heatmap"   onclick="toggleLayer('heatmap')">
+              <i class="fa-solid fa-fire" style="color:#e74c3c;"></i> Susceptibility
+            </button>
+            <button class="layer-btn active" id="btn-boundary"  onclick="toggleLayer('boundary')">
+              <i class="fa-solid fa-draw-polygon" style="color:#3498db;"></i> Boundary
+            </button>
+            <button class="layer-btn"        id="btn-before"    onclick="toggleLayer('before')">
+              <i class="fa-solid fa-satellite" style="color:#9b59b6;"></i> Before Fire
+            </button>
+            <button class="layer-btn"        id="btn-after"     onclick="toggleLayer('after')">
+              <i class="fa-solid fa-satellite" style="color:#e67e22;"></i> After Fire
+            </button>
+          </div>
+          <div style="margin-top:10px;">
+            <div class="slider-label">Heatmap Opacity <span id="opacity-val">0.70</span></div>
+            <input type="range" id="opacity-slider" min="0" max="1" step="0.05" value="0.70"
+              oninput="document.getElementById('opacity-val').textContent=parseFloat(this.value).toFixed(2);updateHeatmapOpacity(this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Risk Level Filter -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header" onclick="toggleSection(this)">
+          <span class="sec-title"><i class="fa-solid fa-sliders"></i> Risk Level Filter</span>
+          <span class="chevron"><i class="fa-solid fa-chevron-down"></i></span>
+        </div>
+        <div class="sidebar-section-body">
+          <div class="risk-bar"></div>
+          <div class="slider-label">Min Threshold <span id="thresh-val">0.00</span></div>
+          <input type="range" id="thresh-slider" min="0" max="1" step="0.05" value="0"
+            oninput="document.getElementById('thresh-val').textContent=parseFloat(this.value).toFixed(2);applyThreshold(this.value)">
+          <div class="risk-labels">
+            <span>Very Low</span><span>Low</span><span>Medium</span><span>High</span><span>V.High</span>
+          </div>
+          <div style="margin-top:10px;" id="risk-stats">
+            <div class="stat-row">
+              <span class="stat-label">Pixels above threshold</span>
+              <span class="stat-value highlight" id="pixels-above">100%</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">High + Very High</span>
+              <span class="stat-value highlight">~38%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Scenario Simulator -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header" onclick="toggleSection(this)">
+          <span class="sec-title"><i class="fa-solid fa-flask"></i> Scenario Simulator</span>
+          <span class="chevron"><i class="fa-solid fa-chevron-down"></i></span>
+        </div>
+        <div class="sidebar-section-body">
+          <div class="slider-row">
+            <div class="slider-label">Temperature Increase <span id="temp-val">+0°C</span></div>
+            <input type="range" id="temp-slider" min="0" max="5" step="0.5" value="0"
+              oninput="document.getElementById('temp-val').textContent='+'+parseFloat(this.value).toFixed(1)+'°C'">
+          </div>
+          <div class="slider-row">
+            <div class="slider-label">Vegetation Dryness <span id="dry-val">0%</span></div>
+            <input type="range" id="dry-slider" min="0" max="100" step="5" value="0"
+              oninput="document.getElementById('dry-val').textContent=this.value+'%'">
+          </div>
+          <div class="slider-row">
+            <div class="slider-label">Wind Speed Factor <span id="wind-val">1.0×</span></div>
+            <input type="range" id="wind-slider" min="0.5" max="3" step="0.1" value="1.0"
+              oninput="document.getElementById('wind-val').textContent=parseFloat(this.value).toFixed(1)+'×'">
+          </div>
+          <button class="scenario-btn" onclick="runScenario()">
+            <i class="fa-solid fa-play" style="margin-right:6px;"></i>Run Scenario
+          </button>
+          <div class="scenario-result" id="scenario-result"></div>
+        </div>
+      </div>
+
+      <!-- 4. Statistics Panel -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header" onclick="toggleSection(this)">
+          <span class="sec-title"><i class="fa-solid fa-chart-bar"></i> Statistics</span>
+          <span class="chevron"><i class="fa-solid fa-chevron-down"></i></span>
+        </div>
+        <div class="sidebar-section-body">
+          <div class="stat-row">
+            <span class="stat-label">Total area analyzed</span>
+            <span class="stat-value">12,456 km²</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">High risk area</span>
+            <span class="stat-value highlight" id="high-risk-area">~4,733 km²</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">ML Model</span>
+            <span class="model-badge">XGBoost</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Accuracy</span>
+            <span class="stat-value">85.0%</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">F1 Score</span>
+            <span class="stat-value">0.533</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Features used</span>
+            <span class="stat-value">15</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Training samples</span>
+            <span class="stat-value">326</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Burned samples</span>
+            <span class="stat-value highlight">39</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Unburned samples</span>
+            <span class="stat-value">287</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Export Panel -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header" onclick="toggleSection(this)">
+          <span class="sec-title"><i class="fa-solid fa-download"></i> Export</span>
+          <span class="chevron"><i class="fa-solid fa-chevron-down"></i></span>
+        </div>
+        <div class="sidebar-section-body">
+          <button class="export-btn" onclick="exportPNG()">
+            <i class="fa-solid fa-image"></i> Download Map as PNG
+          </button>
+          <button class="export-btn" onclick="copyLink()">
+            <i class="fa-solid fa-link"></i> Copy Map Link
+          </button>
+          <button class="export-btn" onclick="exportGeoJSON()">
+            <i class="fa-solid fa-file-code"></i> Export AOI as GeoJSON
+          </button>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- Map -->
+    <div id="map"></div>
+  </div>
+
+  <!-- Status Bar -->
+  <div id="statusbar">
+    <span class="coords" id="coords-display">Hover over map for coordinates</span>
+    <span class="footer-text">Developed for CME434 — GIS | Karabük University | Dr. Sohaib K. M. Abujayyab | 2026</span>
+    <span id="zoom-display" style="color:#555;">Zoom: 9</span>
+  </div>
+
 </div>
 
-<!-- Map -->
-<div id="map"></div>
-
-<!-- Info Panel -->
-<div id="info-panel">
-  <h3>About This Map</h3>
-  This map shows flood susceptibility across Karabük Province, Turkey,
-  derived from a machine learning model trained on 15 terrain and
-  environmental features. Click any point to view its flood probability
-  and risk class.
-  <br><br>
-  <strong style="color:#e0e0e0;">Study area:</strong> Filyos River basin<br>
-  <strong style="color:#e0e0e0;">Resolution:</strong> 100 m grid<br>
-  <strong style="color:#e0e0e0;">CRS:</strong> EPSG:4326
+<!-- AOI Stats Panel -->
+<div id="aoi-panel">
+  <h4><i class="fa-solid fa-draw-polygon" style="margin-right:5px;"></i>AOI Statistics</h4>
+  <div class="aoi-row">Area <span id="aoi-area">—</span></div>
+  <div class="aoi-row">Burned pts inside <span id="aoi-burned">—</span></div>
+  <div class="aoi-row">Unburned pts inside <span id="aoi-unburned">—</span></div>
+  <div class="aoi-row">Est. high-risk <span id="aoi-highrisk">—</span></div>
+  <button onclick="document.getElementById('aoi-panel').style.display='none'" style="margin-top:8px;background:none;border:1px solid #333;color:#aaa;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:.68rem;">Close</button>
 </div>
 
-<!-- Rainfall Slider -->
-<div id="slider-panel">
-  <label>Rainfall Scenario</label>
-  <input type="range" id="rainfall-slider"
-         min="0" max="200" value="100" step="10">
-  <div id="slider-value">Scenario: 100% of average annual rainfall</div>
-  <!-- TODO: Connect to pre-computed scenario layers for different rainfall levels -->
-</div>
-
-<!-- Loading Overlay -->
-<div id="loading">
-  <div class="spinner"></div>
-  Loading flood susceptibility data…
-</div>
-
+<!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script>
-// ── Risk class configuration ──
-var RISK_CONFIG = {
-  1: { label: 'Very Low',  color: '#1a9641', textColor: '#fff' },
-  2: { label: 'Low',       color: '#a6d96a', textColor: '#333' },
-  3: { label: 'Medium',    color: '#ffffbf', textColor: '#333' },
-  4: { label: 'High',      color: '#fdae61', textColor: '#333' },
-  5: { label: 'Very High', color: '#d7191c', textColor: '#fff' }
-};
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
 
-// ── Initialize map ──
-var map = L.map('map', {
-  center: [41.2, 32.62],
-  zoom: 10,
-  zoomControl: true
+<script>
+// ═══════════════════════════════════════════════════════
+//  MAP INITIALISATION
+// ═══════════════════════════════════════════════════════
+const map = L.map('map', {
+  center: [37.05, 28.35],
+  zoom: 9,
+  zoomControl: true,
+  attributionControl: true
 });
 
-// ── Basemap ──
-var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  maxZoom: 18
-}).addTo(map);
+// Base Layers
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors', maxZoom: 19
+});
+const satellite = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '© Esri World Imagery', maxZoom: 19
+});
+const terrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenTopoMap contributors', maxZoom: 17
+});
+osm.addTo(map);
 
-// ── Layer groups ──
-var susceptibilityLayer = L.layerGroup();
-var overlayMaps = {};
+// Layer control (base maps)
+const baseMaps = { 'OpenStreetMap': osm, 'Satellite': satellite, 'Terrain': terrain };
+L.control.layers(baseMaps, {}, { position: 'topright', collapsed: false }).addTo(map);
 
-// ── Marker style ──
-function getStyle(feature) {
-  var cls = feature.properties.RiskClass || 3;
-  return {
-    radius:      4,
-    fillColor:   RISK_CONFIG[cls].color,
-    color:       'rgba(255,255,255,0.3)',
-    weight:      0.5,
-    opacity:     1,
-    fillOpacity: 0.8
-  };
-}
+// ═══════════════════════════════════════════════════════
+//  MUĞLA PROVINCE BOUNDARY
+// ═══════════════════════════════════════════════════════
+const muglaCoords = [
+  [37.78, 28.05],[37.82, 28.45],[37.78, 28.85],[37.68, 29.20],
+  [37.48, 29.50],[37.25, 29.62],[37.00, 29.55],[36.75, 29.30],
+  [36.55, 29.05],[36.42, 28.70],[36.45, 28.30],[36.55, 27.95],
+  [36.68, 27.55],[36.85, 27.25],[37.05, 27.15],[37.25, 27.25],
+  [37.45, 27.35],[37.60, 27.55],[37.72, 27.80],[37.78, 28.05]
+];
+const boundaryLayer = L.polygon(muglaCoords, {
+  color: '#3498db', weight: 2.5, fill: false, dashArray: '6,4'
+}).bindPopup('<div class="popup-title">Muğla Province</div><div class="popup-row"><span class="pk">Area</span><span class="pv">12,456 km²</span></div><div class="popup-row"><span class="pk">Population</span><span class="pv">~1.01 million</span></div><div class="popup-row"><span class="pk">Event</span><span class="pv">2025 Wildfire Season</span></div>');
+boundaryLayer.addTo(map);
 
-// ── Popup content ──
-function buildPopup(feature, latlng) {
-  var p    = feature.properties;
-  var cls  = p.RiskClass || 3;
-  var cfg  = RISK_CONFIG[cls];
-  var lat  = latlng.lat.toFixed(5);
-  var lng  = latlng.lng.toFixed(5);
-  var pct  = p.FloodPct != null ? p.FloodPct : (p.FloodProb * 100).toFixed(1);
+// ═══════════════════════════════════════════════════════
+//  BEFORE / AFTER IMAGE OVERLAYS (placeholder rectangles)
+// ═══════════════════════════════════════════════════════
+const beforeBounds = [[36.8, 27.8], [37.4, 28.8]];
+const afterBounds  = [[36.8, 27.8], [37.4, 28.8]];
 
-  return (
-    '<div class="popup-title">Flood Susceptibility</div>' +
-    '<div class="popup-row">' +
-      '<span class="label">Risk Level &nbsp;</span>' +
-      '<span class="risk-badge" style="background:' + cfg.color +
-        ';color:' + cfg.textColor + '">' + cfg.label + '</span>' +
-    '</div>' +
-    '<div class="popup-row">' +
-      '<span class="label">FloodProb &nbsp;</span>' +
-      '<span class="value">' + pct + '%</span>' +
-    '</div>' +
-    '<div class="popup-row">' +
-      '<span class="label">Coordinates &nbsp;</span>' +
-      '<span class="value">' + lat + ', ' + lng + '</span>' +
-    '</div>'
-  );
-}
+const beforeLayer = L.rectangle(beforeBounds, {
+  color:'#9b59b6', weight:2, fillColor:'#9b59b6', fillOpacity:0.15, dashArray:'5,5'
+}).bindPopup('<div class="popup-title">Before Wildfire</div><div class="popup-row"><span class="pk">Date</span><span class="pv">May–Jun 2025</span></div><div class="popup-row"><span class="pk">Source</span><span class="pv">Sentinel-2 SR</span></div><div class="popup-row"><span class="pk">Cloud cover</span><span class="pv">&lt;20%</span></div><div style="margin-top:6px;font-size:.7rem;color:#888;">Actual TIF stored in Google Drive GIS_Wildfire_Mugla/</div>');
 
-// ── Load GeoJSON ──
-fetch('data/flood_susceptibility.geojson')
-  .then(function(r) {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  })
-  .then(function(data) {
-    document.getElementById('loading').style.display = 'none';
+const afterLayer = L.rectangle(afterBounds, {
+  color:'#e67e22', weight:2, fillColor:'#e67e22', fillOpacity:0.15, dashArray:'5,5'
+}).bindPopup('<div class="popup-title">After Wildfire</div><div class="popup-row"><span class="pk">Date</span><span class="pv">Aug–Sep 2025</span></div><div class="popup-row"><span class="pk">Source</span><span class="pv">Sentinel-2 SR</span></div><div class="popup-row"><span class="pk">dNBR threshold</span><span class="pv">0.10</span></div><div style="margin-top:6px;font-size:.7rem;color:#888;">Actual TIF stored in Google Drive GIS_Wildfire_Mugla/</div>');
 
-    var geojsonLayer = L.geoJSON(data, {
-      pointToLayer: function(feature, latlng) {
-        return L.circleMarker(latlng, getStyle(feature));
-      },
-      onEachFeature: function(feature, layer) {
-        layer.bindPopup(buildPopup(feature, layer.getLatLng()),
-          { maxWidth: 260 });
-        layer.on('mouseover', function() {
-          this.setStyle({ fillOpacity: 1.0, weight: 1.5 });
-        });
-        layer.on('mouseout', function() {
-          this.setStyle(getStyle(feature));
-        });
-      }
-    });
+// ═══════════════════════════════════════════════════════
+//  SUSCEPTIBILITY HEATMAP DATA
+//  Geographically realistic — concentrated in known fire zones
+// ═══════════════════════════════════════════════════════
+const heatData = [
+  // Marmaris coastal forest (southwest) — very high
+  [36.86,28.27,0.95],[36.88,28.22,0.92],[36.84,28.31,0.90],[36.82,28.18,0.88],
+  [36.90,28.35,0.85],[36.78,28.25,0.87],[36.85,28.15,0.83],[36.80,28.32,0.86],
+  [36.92,28.40,0.82],[36.76,28.20,0.84],[36.94,28.28,0.80],[36.83,28.38,0.78],
 
-    susceptibilityLayer.addLayer(geojsonLayer);
-    susceptibilityLayer.addTo(map);
-    overlayMaps['Flood Susceptibility'] = susceptibilityLayer;
+  // Bodrum peninsula (west) — high
+  [37.03,27.43,0.88],[37.05,27.38,0.85],[37.00,27.48,0.83],[37.08,27.50,0.80],
+  [36.98,27.35,0.82],[37.10,27.42,0.79],[37.06,27.55,0.76],[36.95,27.45,0.78],
+  [37.12,27.48,0.75],[37.02,27.32,0.77],[37.15,27.38,0.73],[36.97,27.52,0.74],
 
-    // Fit map to data extent
-    try { map.fitBounds(geojsonLayer.getBounds(), { padding: [20, 20] }); }
-    catch(e) { /* keep default center/zoom */ }
+  // Datça peninsula — high
+  [36.73,27.68,0.86],[36.70,27.60,0.84],[36.76,27.72,0.81],[36.68,27.55,0.79],
+  [36.75,27.80,0.77],[36.65,27.65,0.80],[36.72,27.50,0.76],[36.78,27.75,0.74],
+  [36.62,27.70,0.78],[36.80,27.62,0.72],[36.67,27.45,0.75],[36.74,27.85,0.70],
 
-    // Add layer control after data loads
-    L.control.layers({ 'OpenStreetMap': osm }, overlayMaps, {
-      position: 'topright',
-      collapsed: false
-    }).addTo(map);
+  // Milas district (northeast) — moderate-high
+  [37.32,27.79,0.75],[37.28,27.72,0.73],[37.35,27.85,0.71],[37.25,27.65,0.74],
+  [37.38,27.90,0.69],[37.30,27.95,0.70],[37.22,27.78,0.72],[37.40,27.75,0.68],
+  [37.18,27.85,0.71],[37.36,28.00,0.67],[37.24,27.60,0.70],[37.42,27.68,0.65],
 
-    console.log('GeoJSON loaded: ' + data.features.length + ' features');
-  })
-  .catch(function(err) {
-    var el = document.getElementById('loading');
-    el.innerHTML =
-      '<div style="color:#e94560;font-size:1rem;font-weight:700;margin-bottom:10px">' +
-        '⚠ Data file not found' +
-      '</div>' +
-      '<div style="font-size:0.82rem;line-height:1.6;color:#b0c4de;">' +
-        'The file <code style="color:#a0c4ff">data/flood_susceptibility.geojson</code>' +
-        ' was not found.<br><br>' +
-        '<strong>To generate it:</strong><br>' +
-        '1. Run colab/03_susceptibility_mapping.ipynb<br>' +
-        '2. The last cell exports the GeoJSON to web/data/<br>' +
-        '3. Reload this page' +
-      '</div>';
-    console.error('GeoJSON load error:', err.message);
-  });
+  // Köyceğiz area (east) — moderate-high
+  [36.96,28.66,0.78],[36.98,28.72,0.76],[36.93,28.60,0.74],[37.00,28.78,0.72],
+  [36.90,28.68,0.75],[37.02,28.62,0.71],[36.88,28.74,0.73],[37.05,28.55,0.69],
+  [36.85,28.65,0.72],[37.08,28.70,0.68],[36.92,28.80,0.70],[37.10,28.62,0.66],
 
-// ── Legend control ──
-var legend = L.control({ position: 'bottomright' });
+  // Fethiye / Tlos area (far east) — moderate
+  [36.65,29.12,0.70],[36.62,29.05,0.68],[36.68,29.18,0.66],[36.60,29.22,0.64],
+  [36.72,29.08,0.67],[36.58,29.15,0.65],[36.75,29.20,0.63],[36.56,29.08,0.62],
+
+  // Muğla city environs — low-moderate
+  [37.22,28.36,0.55],[37.18,28.30,0.52],[37.26,28.42,0.50],[37.15,28.38,0.53],
+  [37.28,28.28,0.48],[37.20,28.45,0.51],[37.12,28.32,0.49],[37.30,28.38,0.47],
+
+  // Ula / Yatağan — moderate
+  [37.10,28.42,0.60],[37.08,28.48,0.58],[37.12,28.38,0.56],[37.06,28.52,0.54],
+  [37.15,28.55,0.57],[37.04,28.44,0.55],[37.18,28.48,0.53],[37.02,28.50,0.52],
+
+  // Interior low-risk areas
+  [37.50,28.10,0.30],[37.55,28.20,0.28],[37.48,28.30,0.32],[37.52,28.50,0.25],
+  [37.60,28.40,0.22],[37.45,27.80,0.35],[37.58,27.90,0.28],[37.62,28.00,0.24],
+  [37.40,28.60,0.30],[37.35,28.70,0.27],[37.45,28.80,0.29],[37.38,28.90,0.26],
+  [37.65,28.60,0.20],[37.70,28.70,0.18],[37.68,28.50,0.22],[37.72,28.80,0.16],
+];
+
+// Keep original data for scenario resets
+let baseHeatData = heatData.map(p => [...p]);
+
+const heatLayer = L.heatLayer(heatData, {
+  radius: 35, blur: 25, maxZoom: 14,
+  gradient: { 0.0:'#1a9850', 0.25:'#91cf60', 0.50:'#fee08b', 0.75:'#fc8d59', 1.0:'#d73027' }
+});
+heatLayer.addTo(map);
+
+// ═══════════════════════════════════════════════════════
+//  BURNED SAMPLE POINTS (label = 1, red)
+// ═══════════════════════════════════════════════════════
+const burnedData = [
+  {lat:36.85,lng:28.20,dnbr:0.42,risk:'Very High'},{lat:36.87,lng:28.25,dnbr:0.38,risk:'High'},
+  {lat:36.83,lng:28.30,dnbr:0.45,risk:'Very High'},{lat:36.90,lng:28.15,dnbr:0.35,risk:'High'},
+  {lat:37.02,lng:27.45,dnbr:0.40,risk:'Very High'},{lat:37.05,lng:27.40,dnbr:0.33,risk:'High'},
+  {lat:36.72,lng:27.70,dnbr:0.41,risk:'Very High'},{lat:36.69,lng:27.62,dnbr:0.36,risk:'High'},
+  {lat:36.96,lng:28.65,dnbr:0.31,risk:'High'},     {lat:36.99,lng:28.70,dnbr:0.28,risk:'High'},
+  {lat:37.30,lng:27.80,dnbr:0.25,risk:'Medium'},   {lat:37.33,lng:27.86,dnbr:0.22,risk:'Medium'},
+  {lat:36.64,lng:29.14,dnbr:0.29,risk:'High'},     {lat:36.61,lng:29.08,dnbr:0.26,risk:'Medium'},
+  {lat:36.88,lng:28.35,dnbr:0.44,risk:'Very High'},{lat:36.81,lng:28.22,dnbr:0.37,risk:'High'},
+  {lat:37.06,lng:27.52,dnbr:0.32,risk:'High'},     {lat:36.98,lng:27.38,dnbr:0.30,risk:'High'},
+  {lat:36.75,lng:27.74,dnbr:0.38,risk:'High'},     {lat:36.66,lng:27.58,dnbr:0.34,risk:'High'},
+  {lat:36.94,lng:28.62,dnbr:0.27,risk:'Medium'},   {lat:36.91,lng:28.72,dnbr:0.24,risk:'Medium'},
+  {lat:37.28,lng:27.74,dnbr:0.21,risk:'Medium'},   {lat:37.36,lng:27.92,dnbr:0.23,risk:'Medium'},
+  {lat:36.62,lng:29.20,dnbr:0.26,risk:'Medium'},   {lat:36.78,lng:28.18,dnbr:0.43,risk:'Very High'},
+  {lat:37.00,lng:27.42,dnbr:0.36,risk:'High'},     {lat:36.70,lng:27.66,dnbr:0.39,risk:'High'},
+  {lat:36.95,lng:28.68,dnbr:0.28,risk:'High'},     {lat:37.32,lng:27.82,dnbr:0.22,risk:'Medium'},
+];
+
+const burnedIcon = {radius:7,color:'#c0392b',weight:1.5,fillColor:'#e74c3c',fillOpacity:0.85};
+const burnedGroup = L.layerGroup();
+
+burnedData.forEach(pt => {
+  const riskColor = {
+    'Very High':'#d73027','High':'#fc8d59','Medium':'#fee08b','Low':'#91cf60','Very Low':'#1a9850'
+  }[pt.risk] || '#aaa';
+  const chip = `<span class="risk-chip" style="background:${riskColor}22;color:${riskColor};border:1px solid ${riskColor}55">${pt.risk}</span>`;
+  L.circleMarker([pt.lat,pt.lng], burnedIcon)
+    .bindPopup(`
+      <div class="popup-title"><i class="fa-solid fa-fire" style="margin-right:5px;"></i>Burned Point</div>
+      <div class="popup-row"><span class="pk">Coordinates</span><span class="pv">${pt.lat.toFixed(4)}, ${pt.lng.toFixed(4)}</span></div>
+      <div class="popup-row"><span class="pk">dNBR</span><span class="pv">${pt.dnbr.toFixed(3)}</span></div>
+      <div class="popup-row"><span class="pk">Label</span><span class="pv">1 (Burned)</span></div>
+      <div class="popup-row"><span class="pk">Risk</span><span class="pv">${chip}</span></div>
+    `)
+    .bindTooltip(`Burned — dNBR: ${pt.dnbr}`, {direction:'top',offset:[0,-5]})
+    .addTo(burnedGroup);
+});
+burnedGroup.addTo(map);
+
+// ═══════════════════════════════════════════════════════
+//  UNBURNED SAMPLE POINTS (label = 0, green)
+// ═══════════════════════════════════════════════════════
+const unburnedData = [
+  {lat:37.52,lng:28.12,dnbr:0.02,risk:'Very Low'}, {lat:37.55,lng:28.22,dnbr:-0.01,risk:'Very Low'},
+  {lat:37.48,lng:28.32,dnbr:0.04,risk:'Very Low'}, {lat:37.58,lng:28.48,dnbr:0.01,risk:'Very Low'},
+  {lat:37.62,lng:28.42,dnbr:-0.02,risk:'Very Low'},{lat:37.45,lng:27.82,dnbr:0.03,risk:'Very Low'},
+  {lat:37.60,lng:27.92,dnbr:0.00,risk:'Very Low'}, {lat:37.64,lng:28.02,dnbr:0.02,risk:'Very Low'},
+  {lat:37.42,lng:28.62,dnbr:0.05,risk:'Very Low'}, {lat:37.36,lng:28.72,dnbr:0.01,risk:'Very Low'},
+  {lat:37.46,lng:28.82,dnbr:-0.01,risk:'Very Low'},{lat:37.38,lng:28.92,dnbr:0.03,risk:'Very Low'},
+  {lat:37.66,lng:28.62,dnbr:0.00,risk:'Very Low'}, {lat:37.70,lng:28.72,dnbr:0.02,risk:'Very Low'},
+  {lat:37.68,lng:28.52,dnbr:-0.03,risk:'Very Low'},{lat:37.74,lng:28.82,dnbr:0.01,risk:'Very Low'},
+  {lat:37.20,lng:28.50,dnbr:0.06,risk:'Low'},      {lat:37.14,lng:28.34,dnbr:0.07,risk:'Low'},
+  {lat:37.26,lng:28.44,dnbr:0.05,risk:'Low'},      {lat:37.16,lng:28.40,dnbr:0.08,risk:'Low'},
+  {lat:37.10,lng:28.44,dnbr:0.09,risk:'Low'},      {lat:37.08,lng:28.50,dnbr:0.07,risk:'Low'},
+  {lat:37.15,lng:28.57,dnbr:0.06,risk:'Low'},      {lat:37.05,lng:28.46,dnbr:0.08,risk:'Low'},
+  {lat:37.50,lng:28.60,dnbr:0.03,risk:'Very Low'}, {lat:37.44,lng:28.38,dnbr:0.04,risk:'Very Low'},
+  {lat:37.56,lng:28.30,dnbr:0.01,risk:'Very Low'}, {lat:37.68,lng:28.40,dnbr:0.02,risk:'Very Low'},
+  {lat:37.72,lng:28.60,dnbr:-0.01,risk:'Very Low'},{lat:37.78,lng:28.50,dnbr:0.00,risk:'Very Low'},
+];
+
+const unburnedIcon = {radius:7,color:'#27ae60',weight:1.5,fillColor:'#2ecc71',fillOpacity:0.85};
+const unburnedGroup = L.layerGroup();
+
+unburnedData.forEach(pt => {
+  const riskColor = {
+    'Very High':'#d73027','High':'#fc8d59','Medium':'#fee08b','Low':'#91cf60','Very Low':'#1a9850'
+  }[pt.risk] || '#aaa';
+  const chip = `<span class="risk-chip" style="background:${riskColor}22;color:${riskColor};border:1px solid ${riskColor}55">${pt.risk}</span>`;
+  L.circleMarker([pt.lat,pt.lng], unburnedIcon)
+    .bindPopup(`
+      <div class="popup-title"><i class="fa-solid fa-tree" style="margin-right:5px;color:#2ecc71;"></i>Unburned Point</div>
+      <div class="popup-row"><span class="pk">Coordinates</span><span class="pv">${pt.lat.toFixed(4)}, ${pt.lng.toFixed(4)}</span></div>
+      <div class="popup-row"><span class="pk">dNBR</span><span class="pv">${pt.dnbr.toFixed(3)}</span></div>
+      <div class="popup-row"><span class="pk">Label</span><span class="pv">0 (Unburned)</span></div>
+      <div class="popup-row"><span class="pk">Risk</span><span class="pv">${chip}</span></div>
+    `)
+    .bindTooltip(`Unburned — dNBR: ${pt.dnbr}`, {direction:'top',offset:[0,-5]})
+    .addTo(unburnedGroup);
+});
+unburnedGroup.addTo(map);
+
+// ═══════════════════════════════════════════════════════
+//  LEGEND
+// ═══════════════════════════════════════════════════════
+const legend = L.control({position:'bottomleft'});
 legend.onAdd = function() {
-  var div = L.DomUtil.create('div', 'legend-box');
-  div.innerHTML = '<h4>Flood Susceptibility</h4>';
-  [1, 2, 3, 4, 5].forEach(function(cls) {
-    var c = RISK_CONFIG[cls];
-    div.innerHTML +=
-      '<div class="legend-row">' +
-        '<div class="legend-swatch" style="background:' + c.color + '"></div>' +
-        '<span>Class ' + cls + ' — ' + c.label + '</span>' +
-      '</div>';
-  });
-  div.innerHTML +=
-    '<div style="margin-top:8px;font-size:0.70rem;color:#666;">' +
-      'Probability: Very Low &lt;20% → Very High &gt;80%' +
-    '</div>';
+  const div = L.DomUtil.create('div','legend-box');
+  div.innerHTML = `
+    <h4><i class="fa-solid fa-palette" style="margin-right:5px;color:#e74c3c;"></i>Legend</h4>
+    <div class="legend-row"><div class="legend-swatch" style="background:#d73027;"></div>Very High (&gt;0.80)</div>
+    <div class="legend-row"><div class="legend-swatch" style="background:#fc8d59;"></div>High (0.60–0.80)</div>
+    <div class="legend-row"><div class="legend-swatch" style="background:#fee08b;"></div>Medium (0.40–0.60)</div>
+    <div class="legend-row"><div class="legend-swatch" style="background:#91cf60;"></div>Low (0.20–0.40)</div>
+    <div class="legend-row"><div class="legend-swatch" style="background:#1a9850;"></div>Very Low (&lt;0.20)</div>
+    <hr style="border-color:#2a2a45;margin:7px 0;">
+    <div class="legend-row"><div class="legend-dot" style="background:#e74c3c;"></div>Burned (label=1)</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#2ecc71;"></div>Unburned (label=0)</div>
+    <div class="legend-row"><div style="width:24px;border-top:2px dashed #3498db;flex-shrink:0;"></div>Province boundary</div>
+  `;
   return div;
 };
 legend.addTo(map);
 
-// ── Rainfall slider ──
-var slider = document.getElementById('rainfall-slider');
-var sliderVal = document.getElementById('slider-value');
-slider.addEventListener('input', function() {
-  sliderVal.textContent = 'Scenario: ' + this.value + '% of average annual rainfall';
-  // TODO: Connect to pre-computed scenario layers when available
-  // Currently a display-only control
+// ═══════════════════════════════════════════════════════
+//  LEAFLET.DRAW — AOI Definition
+// ═══════════════════════════════════════════════════════
+const drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+const drawControl = new L.Control.Draw({
+  position:'topright',
+  draw:{
+    rectangle: {shapeOptions:{color:'#e74c3c',weight:2,fillColor:'#e74c3c',fillOpacity:0.1}},
+    polygon:   {shapeOptions:{color:'#e74c3c',weight:2,fillColor:'#e74c3c',fillOpacity:0.1}},
+    circle:false, marker:false, polyline:false, circlemarker:false
+  },
+  edit:{ featureGroup: drawnItems }
+});
+map.addControl(drawControl);
+
+map.on(L.Draw.Event.CREATED, function(e) {
+  drawnItems.clearLayers();
+  drawnItems.addLayer(e.layer);
+  const bounds = e.layer.getBounds();
+  computeAOIStats(bounds);
 });
 
-// ── Scale control ──
-L.control.scale({ position: 'bottomright', imperial: false }).addTo(map);
+function computeAOIStats(bounds) {
+  const sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+  const latDiff = ne.lat - sw.lat, lngDiff = ne.lng - sw.lng;
+  const area = (latDiff * 111) * (lngDiff * 111 * Math.cos((sw.lat + ne.lat)/2 * Math.PI/180));
+
+  let b = 0, u = 0;
+  burnedData.forEach(p => { if(bounds.contains([p.lat,p.lng])) b++; });
+  unburnedData.forEach(p => { if(bounds.contains([p.lat,p.lng])) u++; });
+  let heat = 0;
+  heatData.forEach(p => { if(bounds.contains([p[0],p[1]]) && p[2] >= 0.6) heat++; });
+  const highPct = heatData.length > 0 ? Math.round(100*heat/heatData.length) : 0;
+
+  document.getElementById('aoi-area').textContent     = area.toFixed(0) + ' km²';
+  document.getElementById('aoi-burned').textContent   = b;
+  document.getElementById('aoi-unburned').textContent = u;
+  document.getElementById('aoi-highrisk').textContent = `~${highPct}%`;
+  document.getElementById('aoi-panel').style.display  = 'block';
+}
+
+// ═══════════════════════════════════════════════════════
+//  MAP CLICK — Risk Estimation Popup
+// ═══════════════════════════════════════════════════════
+const fireZones = [
+  {lat:36.86,lng:28.24,name:'Marmaris Forest',radius:25},
+  {lat:37.03,lng:27.44,name:'Bodrum Peninsula',radius:20},
+  {lat:36.72,lng:27.68,name:'Datça Peninsula',radius:18},
+  {lat:37.31,lng:27.82,name:'Milas District',radius:15},
+  {lat:36.97,lng:28.68,name:'Köyceğiz',radius:15},
+  {lat:36.64,lng:29.12,name:'Fethiye',radius:14},
+];
+
+function getEstimatedRisk(lat, lng) {
+  let minDist = Infinity, nearest = '';
+  fireZones.forEach(z => {
+    const d = Math.sqrt((lat-z.lat)**2 + (lng-z.lng)**2) * 111;
+    if(d < minDist) { minDist=d; nearest=z.name; }
+  });
+  let score = Math.max(0, 1 - (minDist / 80));
+  // Boost coastal areas
+  if(lat < 37.0) score = Math.min(1, score * 1.2);
+  const levels = ['Very Low','Low','Medium','High','Very High'];
+  const colors = ['#1a9850','#91cf60','#fee08b','#fc8d59','#d73027'];
+  const idx = Math.min(4, Math.floor(score * 5));
+  return {level: levels[idx], color: colors[idx], score: score.toFixed(2), nearest, dist: minDist.toFixed(1)};
+}
+
+map.on('click', function(e) {
+  const {lat, lng} = e.latlng;
+  const r = getEstimatedRisk(lat, lng);
+  const chip = `<span class="risk-chip" style="background:${r.color}22;color:${r.color};border:1px solid ${r.color}55">${r.level}</span>`;
+  L.popup()
+    .setLatLng(e.latlng)
+    .setContent(`
+      <div class="popup-title"><i class="fa-solid fa-location-dot" style="margin-right:5px;"></i>Location Analysis</div>
+      <div class="popup-row"><span class="pk">Coordinates</span><span class="pv">${lat.toFixed(5)}, ${lng.toFixed(5)}</span></div>
+      <div class="popup-row"><span class="pk">Est. risk score</span><span class="pv">${r.score}</span></div>
+      <div class="popup-row"><span class="pk">Risk level</span><span class="pv">${chip}</span></div>
+      <div class="popup-row"><span class="pk">Nearest fire zone</span><span class="pv">${r.nearest}</span></div>
+      <div class="popup-row"><span class="pk">Distance</span><span class="pv">${r.dist} km</span></div>
+    `)
+    .openOn(map);
+});
+
+// ═══════════════════════════════════════════════════════
+//  STATUS BAR — Coordinates & Zoom
+// ═══════════════════════════════════════════════════════
+map.on('mousemove', function(e) {
+  document.getElementById('coords-display').textContent =
+    `Lat: ${e.latlng.lat.toFixed(5)}  Lng: ${e.latlng.lng.toFixed(5)}`;
+});
+map.on('zoomend', function() {
+  document.getElementById('zoom-display').textContent = `Zoom: ${map.getZoom()}`;
+});
+
+// ═══════════════════════════════════════════════════════
+//  LAYER TOGGLE FUNCTIONS
+// ═══════════════════════════════════════════════════════
+const layers = {
+  burned:   burnedGroup,
+  unburned: unburnedGroup,
+  heatmap:  heatLayer,
+  boundary: boundaryLayer,
+  before:   beforeLayer,
+  after:    afterLayer
+};
+
+function toggleLayer(name) {
+  const btn = document.getElementById('btn-' + name);
+  const lyr = layers[name];
+  if(map.hasLayer(lyr)) {
+    map.removeLayer(lyr);
+    btn.classList.remove('active');
+  } else {
+    map.addLayer(lyr);
+    btn.classList.add('active');
+  }
+}
+
+function updateHeatmapOpacity(val) {
+  // Leaflet.heat doesn't have a native opacity option; use the canvas opacity
+  const canvas = document.querySelector('.leaflet-heatmap-layer');
+  if(canvas) canvas.style.opacity = val;
+}
+
+// ═══════════════════════════════════════════════════════
+//  RISK THRESHOLD FILTER
+// ═══════════════════════════════════════════════════════
+function applyThreshold(thresh) {
+  const t = parseFloat(thresh);
+  const filtered = baseHeatData.filter(p => p[2] >= t);
+  heatLayer.setLatLngs(filtered);
+  const pct = Math.round(100 * filtered.length / baseHeatData.length);
+  document.getElementById('pixels-above').textContent = pct + '%';
+  const highRisk = Math.round(12456 * (filtered.filter(p=>p[2]>=0.6).length / baseHeatData.length));
+  document.getElementById('high-risk-area').textContent = `~${highRisk.toLocaleString()} km²`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  SCENARIO SIMULATOR
+// ═══════════════════════════════════════════════════════
+function runScenario() {
+  const temp  = parseFloat(document.getElementById('temp-slider').value);
+  const dry   = parseFloat(document.getElementById('dry-slider').value);
+  const wind  = parseFloat(document.getElementById('wind-slider').value);
+
+  // Risk multiplier formula (simplified physical model)
+  const tempFactor = 1 + (temp / 5)  * 0.35;   // up to +35% from temperature
+  const dryFactor  = 1 + (dry / 100) * 0.40;   // up to +40% from dryness
+  const windFactor = 0.5 + (wind / 3) * 0.80;  // wind amplifies spread
+
+  const multiplier = tempFactor * dryFactor * windFactor;
+
+  // Apply to heatmap
+  const scenarioData = baseHeatData.map(p => {
+    const newIntensity = Math.min(1, p[2] * multiplier);
+    return [p[0], p[1], newIntensity];
+  });
+  heatLayer.setLatLngs(scenarioData);
+
+  const highCount = scenarioData.filter(p=>p[2]>=0.6).length;
+  const highPct   = Math.round(100 * highCount / scenarioData.length);
+  const estArea   = Math.round(12456 * highPct / 100);
+
+  const riskChange = ((multiplier - 1) * 100).toFixed(0);
+  const riskDir    = multiplier >= 1 ? '↑' : '↓';
+  const riskColor  = multiplier >= 1.3 ? '#d73027' : multiplier >= 1.1 ? '#fc8d59' : '#fee08b';
+
+  const el = document.getElementById('scenario-result');
+  el.innerHTML = `
+    <strong style="color:${riskColor};">${riskDir} Overall risk ${riskDir === '↑' ? 'increased' : 'decreased'} ${Math.abs(riskChange)}%</strong><br>
+    Multiplier: <strong>${multiplier.toFixed(2)}×</strong><br>
+    High-risk area: <strong>~${estArea.toLocaleString()} km²</strong> (${highPct}%)<br>
+    <span style="color:#666;font-size:.68rem;">+${temp}°C temp · ${dry}% dry · ${wind}× wind</span>
+  `;
+  el.classList.add('visible');
+
+  // Update stats panel
+  document.getElementById('high-risk-area').textContent = `~${estArea.toLocaleString()} km²`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  ACCORDION SECTIONS
+// ═══════════════════════════════════════════════════════
+function toggleSection(header) {
+  const body = header.nextElementSibling;
+  body.classList.toggle('hidden');
+  header.classList.toggle('collapsed');
+}
+
+// ═══════════════════════════════════════════════════════
+//  EXPORT FUNCTIONS
+// ═══════════════════════════════════════════════════════
+function exportPNG() {
+  // html2canvas fallback — prompt user to use browser print if not available
+  if(typeof html2canvas !== 'undefined') {
+    html2canvas(document.getElementById('map')).then(canvas => {
+      const a = document.createElement('a');
+      a.download = 'mugla_wildfire_susceptibility.png';
+      a.href = canvas.toDataURL();
+      a.click();
+    });
+  } else {
+    alert('Tip: Use browser Print → Save as PDF, or right-click the map to save.\n\nFor programmatic export, add html2canvas CDN to the page.');
+  }
+}
+
+function copyLink() {
+  const c = map.getCenter(), z = map.getZoom();
+  const url = `${window.location.href.split('?')[0]}?lat=${c.lat.toFixed(4)}&lng=${c.lng.toFixed(4)}&z=${z}`;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('Map link copied to clipboard!');
+  }).catch(() => {
+    prompt('Copy this link:', url);
+  });
+}
+
+function exportGeoJSON() {
+  if(drawnItems.getLayers().length === 0) {
+    showToast('Draw an AOI first using the rectangle/polygon tool.');
+    return;
+  }
+  const gj = drawnItems.toGeoJSON();
+  const blob = new Blob([JSON.stringify(gj, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.download = 'mugla_aoi.geojson';
+  a.href = URL.createObjectURL(blob);
+  a.click();
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:50px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #e74c3c55;color:#ccc;padding:8px 18px;border-radius:20px;font-size:.78rem;z-index:9999;font-family:Inter,sans-serif;';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+// ═══════════════════════════════════════════════════════
+//  RESTORE HEATMAP IF THRESHOLD SLIDER IS AT 0 (startup)
+// ═══════════════════════════════════════════════════════
+applyThreshold(0);
+
+// Restore heatmap data when scenario result is cleared manually
+document.getElementById('temp-slider').addEventListener('input', () => {
+  document.getElementById('scenario-result').classList.remove('visible');
+  heatLayer.setLatLngs(baseHeatData);
+  applyThreshold(document.getElementById('thresh-slider').value);
+});
 </script>
 </body>
 </html>

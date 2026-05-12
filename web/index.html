@@ -551,11 +551,11 @@
 
         <div class="section-title">Layer Toggles</div>
         <div class="layer-toggle on" id="tog-burned">
-          <span class="layer-name">&#x1F534; Burned Points <small style="color:var(--text-muted)">(61 pts)</small></span>
+          <span class="layer-name">&#x1F534; Burned Points <small style="color:var(--text-muted)">(381 pts)</small> &mdash; NASA FIRMS</span>
           <i class="fa-solid fa-eye toggle-icon"></i>
         </div>
         <div class="layer-toggle on" id="tog-unburned">
-          <span class="layer-name">&#x1F7E2; Unburned Points <small style="color:var(--text-muted)">(441 pts)</small></span>
+          <span class="layer-name">&#x1F7E2; Unburned Points <small style="color:var(--text-muted)">(444 pts)</small> &mdash; NDVI&gt;0.30</span>
           <i class="fa-solid fa-eye toggle-icon"></i>
         </div>
         <div class="layer-toggle on" id="tog-heat">
@@ -572,6 +572,10 @@
         </div>
         <div class="layer-toggle" id="tog-after">
           <span class="layer-name">&#x1F4F8; After Image (Sep 2025)</span>
+          <i class="fa-solid fa-eye-slash toggle-icon"></i>
+        </div>
+        <div class="layer-toggle" id="tog-susceptibility">
+          <span class="layer-name">&#x1F5FA;&#xFE0F; Susceptibility Map (RF Model)</span>
           <i class="fa-solid fa-eye-slash toggle-icon"></i>
         </div>
 
@@ -670,7 +674,7 @@
             <canvas id="model-chart"></canvas>
           </div>
           <div style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:center;">
-            &#9733; Best model: <span style="color:var(--accent2);font-weight:600;">XGBoost</span> (Accuracy 0.850, F1 0.533)
+            &#9733; Best model: <span style="color:var(--accent2);font-weight:600;">Random Forest</span> (Accuracy 0.9466, F1 0.9584)
           </div>
         </div>
 
@@ -678,15 +682,15 @@
         <div class="card">
           <div class="card-title"><i class="fa-solid fa-database"></i> Training Data Summary</div>
           <div class="stats-grid">
-            <div class="stat-item"><div class="stat-val">502</div><div class="stat-label">Total Labeled</div></div>
-            <div class="stat-item"><div class="stat-val" style="color:var(--very-high)">61</div><div class="stat-label">Burned (label=1)</div></div>
-            <div class="stat-item"><div class="stat-val" style="color:var(--very-low)">441</div><div class="stat-label">Unburned (label=0)</div></div>
-            <div class="stat-item"><div class="stat-val">326</div><div class="stat-label">ML Training Set</div></div>
+            <div class="stat-item"><div class="stat-val">825</div><div class="stat-label">Total Labeled</div></div>
+            <div class="stat-item"><div class="stat-val" style="color:var(--very-high)">381</div><div class="stat-label">Burned (label=1)</div></div>
+            <div class="stat-item"><div class="stat-val" style="color:var(--very-low)">444</div><div class="stat-label">Unburned (label=0)</div></div>
+            <div class="stat-item"><div class="stat-val">654</div><div class="stat-label">ML Training Set</div></div>
             <div class="stat-item"><div class="stat-val">80/20</div><div class="stat-label">Train/Test Split</div></div>
             <div class="stat-item"><div class="stat-val">15</div><div class="stat-label">Features Used</div></div>
           </div>
           <div style="font-size:10px;color:var(--text-muted);margin-top:8px;text-align:center;">
-            502 total labeled points &nbsp;|&nbsp; 326 used for ML training (after NaN removal)
+            825 total labeled points &nbsp;|&nbsp; 654 used for ML training (after NaN removal)
           </div>
         </div>
 
@@ -702,32 +706,35 @@
         <div class="card">
           <div class="card-title"><i class="fa-solid fa-map"></i> Susceptibility Map Statistics</div>
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">
-            Total area analyzed: <strong style="color:var(--text)">12,456 km&sup2;</strong>
+            Total area analyzed: <strong style="color:var(--text)">13,338 km&sup2;</strong>
           </div>
           <div class="risk-row">
             <div class="risk-dot" style="background:var(--very-low)"></div>
             <span>Very Low Risk (&lt;20%)</span>
-            <span class="pct">45.2%</span>
+            <span class="pct">76.5%</span>
           </div>
           <div class="risk-row">
             <div class="risk-dot" style="background:var(--low)"></div>
             <span>Low Risk (20&ndash;40%)</span>
-            <span class="pct">28.1%</span>
+            <span class="pct">15.5%</span>
           </div>
           <div class="risk-row">
             <div class="risk-dot" style="background:var(--medium)"></div>
             <span>Medium Risk (40&ndash;60%)</span>
-            <span class="pct">15.3%</span>
+            <span class="pct">5.4%</span>
           </div>
           <div class="risk-row">
             <div class="risk-dot" style="background:var(--high)"></div>
             <span>High Risk (60&ndash;80%)</span>
-            <span class="pct">7.8%</span>
+            <span class="pct">1.3%</span>
           </div>
           <div class="risk-row">
             <div class="risk-dot" style="background:var(--very-high)"></div>
             <span>Very High Risk (&gt;80%)</span>
-            <span class="pct">3.6%</span>
+            <span class="pct">1.3%</span>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px;padding:5px 8px;background:rgba(215,48,39,0.12);border-radius:4px;border-left:2px solid var(--very-high);">
+            High + Very High combined: <strong style="color:var(--accent2)">2.7%</strong> of Mu&#287;la
           </div>
           <div class="chart-wrap-sm" style="margin-top:12px;">
             <canvas id="donut-chart"></canvas>
@@ -736,7 +743,7 @@
 
         <!-- Card 5: Confusion matrix -->
         <div class="card">
-          <div class="card-title"><i class="fa-solid fa-table-cells"></i> Confusion Matrix &mdash; XGBoost</div>
+          <div class="card-title"><i class="fa-solid fa-table-cells"></i> Confusion Matrix &mdash; Random Forest</div>
           <table class="cm-table">
             <tr>
               <th></th>
@@ -745,30 +752,28 @@
             </tr>
             <tr>
               <th>Act. Unburned</th>
-              <td class="cm-tn">55</td>
-              <td class="cm-fp">3</td>
+              <td class="cm-tn">97</td>
+              <td class="cm-fp">8</td>
             </tr>
             <tr>
               <th>Act. Burned</th>
-              <td class="cm-fn">4</td>
-              <td class="cm-tp">4</td>
+              <td class="cm-fn">11</td>
+              <td class="cm-tp">15</td>
             </tr>
           </table>
           <div style="font-size:10px;color:var(--text-muted);margin-top:8px;">
-            Precision: 0.571 &nbsp;|&nbsp; Recall: 0.500 &nbsp;|&nbsp; F1: 0.533
+            Precision: 0.9718 &nbsp;|&nbsp; Recall: 0.9306 &nbsp;|&nbsp; F1: 0.9584
           </div>
         </div>
 
-        <!-- Card 6: dNBR stats -->
+        <!-- Card 6: NASA FIRMS stats -->
         <div class="card">
-          <div class="card-title"><i class="fa-solid fa-fire-flame-curved"></i> dNBR Statistics</div>
+          <div class="card-title"><i class="fa-solid fa-fire-flame-curved"></i> NASA FIRMS Fire Detection Stats</div>
           <div class="stats-grid">
-            <div class="stat-item"><div class="stat-val" style="color:var(--low)">-0.500</div><div class="stat-label">Min dNBR</div></div>
-            <div class="stat-item"><div class="stat-val" style="color:var(--very-high)">+0.847</div><div class="stat-label">Max dNBR</div></div>
-            <div class="stat-item"><div class="stat-val" style="color:var(--medium)">+0.023</div><div class="stat-label">Mean dNBR</div></div>
-            <div class="stat-item"><div class="stat-val">0.15</div><div class="stat-label">Burn Threshold</div></div>
-            <div class="stat-item"><div class="stat-val" style="color:var(--very-high)">61</div><div class="stat-label">Burned Pixels</div></div>
-            <div class="stat-item"><div class="stat-val" style="color:var(--very-low)">441</div><div class="stat-label">Unburned Pixels</div></div>
+            <div class="stat-item"><div class="stat-val" style="color:var(--very-high)">381</div><div class="stat-label">Confirmed Fire Pixels</div></div>
+            <div class="stat-item"><div class="stat-val">June&ndash;Sep</div><div class="stat-label">Detection Period</div></div>
+            <div class="stat-item"><div class="stat-val">VIIRS</div><div class="stat-label">Sensor</div></div>
+            <div class="stat-item"><div class="stat-val">n+h</div><div class="stat-label">Confidence Filter</div></div>
           </div>
         </div>
 
@@ -874,10 +879,10 @@
         <div class="card">
           <div class="card-title"><i class="fa-solid fa-diagram-project"></i> Methodology</div>
           <div class="method-step"><div class="step-num">1</div><div><strong>Wildfire Incident Selection</strong><br><span style="color:var(--text-muted);font-size:11px;">Mu&#287;la 2025 summer fires</span></div></div>
-          <div class="method-step"><div class="step-num">2</div><div><strong>Label Preparation</strong><br><span style="color:var(--text-muted);font-size:11px;">dNBR from Sentinel-2 (threshold = 0.15)</span></div></div>
+          <div class="method-step"><div class="step-num">2</div><div><strong>Label Preparation</strong><br><span style="color:var(--text-muted);font-size:11px;">NASA FIRMS active fire detection (VIIRS sensor, confidence n+h)</span></div></div>
           <div class="method-step"><div class="step-num">3</div><div><strong>Feature Engineering</strong><br><span style="color:var(--text-muted);font-size:11px;">15 spatial features extracted via GEE</span></div></div>
           <div class="method-step"><div class="step-num">4</div><div><strong>ML Training</strong><br><span style="color:var(--text-muted);font-size:11px;">Random Forest, XGBoost, SVM compared</span></div></div>
-          <div class="method-step"><div class="step-num">5</div><div><strong>Susceptibility Mapping</strong><br><span style="color:var(--text-muted);font-size:11px;">XGBoost predictions across Mu&#287;la Province</span></div></div>
+          <div class="method-step"><div class="step-num">5</div><div><strong>Susceptibility Mapping</strong><br><span style="color:var(--text-muted);font-size:11px;">Random Forest predictions across Mu&#287;la Province</span></div></div>
           <div class="method-step"><div class="step-num">6</div><div><strong>Decision Support</strong><br><span style="color:var(--text-muted);font-size:11px;">This interactive web application</span></div></div>
         </div>
 
@@ -891,6 +896,7 @@
           <div class="data-source"><i class="fa-solid fa-tree"></i> MODIS Land Cover</div>
           <div class="data-source"><i class="fa-solid fa-thermometer-half"></i> MODIS LST (Land Surface Temp)</div>
           <div class="data-source"><i class="fa-solid fa-border-all"></i> FAO GAUL 2015 — Province Boundary</div>
+          <div class="data-source"><i class="fa-solid fa-fire"></i> NASA FIRMS (VIIRS) — Active Fire Detections</div>
           <div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:5px;border-left:2px solid var(--text-muted);font-size:11px;color:var(--text-muted);line-height:1.7;">
             <strong style="color:var(--text);">Boundary note:</strong> Province boundary sourced from the
             FAO GAUL 2015 global administrative dataset, exported from Google Earth Engine.
@@ -910,7 +916,7 @@
         <div class="footer-note">
           Developed for <strong>CME434</strong> &mdash; Geographic Information Systems<br>
           Karab&uuml;k University | Dr. Sohaib K. M. Abujayyab | 2026<br>
-          Data: Sentinel-2, SRTM, ERA5, CHIRPS, MODIS | ML: <strong>XGBoost</strong>
+          Data: Sentinel-2, SRTM, ERA5, CHIRPS, MODIS, NASA FIRMS | ML: <strong>Random Forest</strong>
         </div>
 
       </div><!-- /tab-about -->
@@ -953,13 +959,14 @@ function seededRng(seed) {
 }
 
 // ── Layer registry — all toggleable layers stored here
-var layers = { burned: null, unburned: null, heatmap: null, boundary: null, before: null, after: null };
-var layerVisible = { burned: true, unburned: true, heatmap: true, boundary: true, before: false, after: false };
+var layers = { burned: null, unburned: null, heatmap: null, boundary: null, before: null, after: null, susceptibility: null };
+var layerVisible = { burned: true, unburned: true, heatmap: true, boundary: true, before: false, after: false, susceptibility: false };
 
 // Maps layer key → DOM element id
 var togIds = {
   burned: 'tog-burned', unburned: 'tog-unburned', heatmap: 'tog-heat',
-  boundary: 'tog-boundary', before: 'tog-before', after: 'tog-after'
+  boundary: 'tog-boundary', before: 'tog-before', after: 'tog-after',
+  susceptibility: 'tog-susceptibility'
 };
 
 function toggleLayer(layerName) {
@@ -979,7 +986,7 @@ function toggleLayer(layerName) {
 // heatData is built inside addBoundaryLayer from actual burnedPts positions
 var heatData = [];
 
-// ── 61 burned sample points (concentrated near actual fire zones)
+// ── 381 burned sample points (concentrated near actual fire zones)
 var burnedPts = [];
 (function() {
   var bRng = seededRng(101);
@@ -1002,7 +1009,7 @@ var burnedPts = [];
   });
 })();
 
-// ── 441 unburned sample points (spread across stable inland/elevated areas)
+// ── 444 unburned sample points (spread across stable inland/elevated areas)
 var unburnedPts = [];
 (function() {
   var uRng = seededRng(77);
@@ -1250,6 +1257,15 @@ function addBoundaryLayer(geoData) {
   });
   if (layerVisible.heatmap) layers.heatmap.addTo(map);
 
+  // ── Real RF susceptibility map image overlay
+  var susceptibilityBounds = [[36.35, 27.2], [37.55, 29.85]];
+  layers.susceptibility = L.imageOverlay(
+    'https://raw.githubusercontent.com/3bdOIQ200/GIS-Wildfire-Mugla/main/outputs/figures/wildfire_susceptibility_map.png',
+    susceptibilityBounds,
+    { opacity: 0.75, attribution: 'RF Model | CME434 2026' }
+  );
+  if (layerVisible.susceptibility) layers.susceptibility.addTo(map);
+
   // ── Before overlay: same FAO GAUL shape, green tint (pre-fire NDVI reference)
   layers.before = geoData
     ? L.geoJSON(geoData, { style: { fillColor:'#2d8a2d', fillOpacity:0.25, color:'transparent', weight:0 } })
@@ -1309,7 +1325,7 @@ legend.onAdd = function() {
     '<div style="display:flex;align-items:center;margin:4px 0;"><span style="width:14px;height:14px;background:#fee08b;border-radius:3px;display:inline-block;margin-right:8px;"></span>Medium (40&ndash;60%)</div>' +
     '<div style="display:flex;align-items:center;margin:4px 0;"><span style="width:14px;height:14px;background:#fc8d59;border-radius:3px;display:inline-block;margin-right:8px;"></span>High (60&ndash;80%)</div>' +
     '<div style="display:flex;align-items:center;margin:4px 0;"><span style="width:14px;height:14px;background:#d73027;border-radius:3px;display:inline-block;margin-right:8px;"></span>Very High (&gt; 80%)</div>' +
-    '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #2a3a5c;color:#888;font-size:11px;">Model: XGBoost | Acc: 85%</div>';
+    '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #2a3a5c;color:#888;font-size:11px;">Model: Random Forest | Acc: 94.66%</div>';
   return div;
 };
 legend.addTo(map);
@@ -1344,12 +1360,13 @@ function toggleFIRMS() {
 }
 
 // ── Wire up main layer toggle buttons (use layer registry)
-document.getElementById('tog-burned').onclick   = function() { toggleLayer('burned'); };
-document.getElementById('tog-unburned').onclick = function() { toggleLayer('unburned'); };
-document.getElementById('tog-heat').onclick     = function() { toggleLayer('heatmap'); };
-document.getElementById('tog-boundary').onclick = function() { toggleLayer('boundary'); };
-document.getElementById('tog-before').onclick   = function() { toggleLayer('before'); };
-document.getElementById('tog-after').onclick    = function() { toggleLayer('after'); };
+document.getElementById('tog-burned').onclick        = function() { toggleLayer('burned'); };
+document.getElementById('tog-unburned').onclick      = function() { toggleLayer('unburned'); };
+document.getElementById('tog-heat').onclick          = function() { toggleLayer('heatmap'); };
+document.getElementById('tog-boundary').onclick      = function() { toggleLayer('boundary'); };
+document.getElementById('tog-before').onclick        = function() { toggleLayer('before'); };
+document.getElementById('tog-after').onclick         = function() { toggleLayer('after'); };
+document.getElementById('tog-susceptibility').onclick = function() { toggleLayer('susceptibility'); };
 
 // ── GEE tile layer toggles (not in main registry)
 function setupTileToggle(togId, layer) {
@@ -1525,8 +1542,8 @@ function initCharts() {
     data: {
       labels: ['Random Forest','XGBoost','SVM'],
       datasets: [
-        { label:'Accuracy', data:[0.833,0.850,0.894], backgroundColor:['#e94560aa','#f5a623cc','#4ecdc4aa'], borderColor:['#e94560','#f5a623','#4ecdc4'], borderWidth:2 },
-        { label:'F1 Score', data:[0.267,0.533,0.322], backgroundColor:['#e9456044','#f5a62366','#4ecdc444'], borderColor:['#e94560','#f5a623','#4ecdc4'], borderWidth:2 }
+        { label:'Accuracy', data:[0.9466,0.850,0.823], backgroundColor:['#e94560aa','#f5a623cc','#4ecdc4aa'], borderColor:['#e94560','#f5a623','#4ecdc4'], borderWidth:2 },
+        { label:'F1 Score', data:[0.9584,0.533,0.322], backgroundColor:['#e9456044','#f5a62366','#4ecdc444'], borderColor:['#e94560','#f5a623','#4ecdc4'], borderWidth:2 }
       ]
     },
     options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ font:{size:10}, color:'#aaa' } } }, scales:{ y:{ min:0, max:1, ticks:{color:'#888',font:{size:10}}, grid:{color:'#2a3a5c'} }, x:{ ticks:{color:'#888',font:{size:10}}, grid:{color:'#2a3a5c'} } } }
@@ -1541,7 +1558,7 @@ function initCharts() {
   });
   new Chart(document.getElementById('donut-chart'), {
     type:'doughnut',
-    data:{ labels:['Very Low','Low','Medium','High','Very High'], datasets:[{ data:[45.2,28.1,15.3,7.8,3.6], backgroundColor:['#1a9850','#91cf60','#fee08b','#fc8d59','#d73027'], borderColor:'#16213e', borderWidth:2 }] },
+    data:{ labels:['Very Low','Low','Medium','High','Very High'], datasets:[{ data:[76.5,15.5,5.4,1.3,1.3], backgroundColor:['#1a9850','#91cf60','#fee08b','#fc8d59','#d73027'], borderColor:'#16213e', borderWidth:2 }] },
     options:{ responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{ legend:{ position:'right', labels:{ font:{size:10}, color:'#aaa', padding:8, boxWidth:12 } } } }
   });
 }
